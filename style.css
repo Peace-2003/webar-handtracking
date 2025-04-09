@@ -1,30 +1,31 @@
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
-  
-  body {
-    overflow: hidden;
-    background: transparent;
-  }
-  
-  video {
-    display: none;
-  }
-  
-  #drawing-canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-    pointer-events: none;
-    z-index: 1;
-  }
-  
-  #threejs-canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 0;
-  }
-  
+body, html {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: #000;
+}
+
+#startBtn {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 15px 25px;
+  font-size: 18px;
+  border: none;
+  border-radius: 8px;
+  background-color: #00aaff;
+  color: white;
+  cursor: pointer;
+}
+
+.input_video {
+  display: none;
+}
+
+#drawing-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+}

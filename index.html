@@ -4,53 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>WebAR Hand Tracking</title>
-
-  <!-- Three.js CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-
-  <!-- MediaPipe Hands -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
-
-  <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
 </head>
 <body>
-  <video class="input_video" autoplay playsinline></video>
+
+  <button id="startBtn">Start Experience</button>
+
+  <video class="input_video" autoplay playsinline muted></video>
   <canvas id="drawing-canvas"></canvas>
 
-  <script>
-    // Setup Three.js
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.domElement.id = "threejs-canvas";
-    document.body.appendChild(renderer.domElement);
-
-    // Cube
-    const geometry = new THREE.BoxGeometry();
-    const material = new THREE.MeshBasicMaterial({ color: 0x44aa88 });
-    const cube = new THREE.Mesh(geometry, material);
-    scene.add(cube);
-    camera.position.z = 3;
-
-    // Animation loop
-    function animate() {
-      requestAnimationFrame(animate);
-      cube.rotation.x += 0.01;
-      cube.rotation.y += 0.01;
-      renderer.render(scene, camera);
-    }
-    animate();
-
-    // Setup MediaPipe
-    const videoElement = document.querySelector('.input_video');
-    const canvasElement = document.getElementById('drawing-canvas');
-    const canvasCtx = canvasElement.getContext('2d');
-
-    canvasElement.width = window.innerWidth;
-    canvasElement.height = window.innerHeight;
-
-    const hands
+  <script src="script.js"></script>
+</body>
+</html>
