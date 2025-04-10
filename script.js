@@ -67,6 +67,8 @@ function startCamera() {
     },
     width: 640,
     height: 480
+    facingMode: 'environment' // ADD THIS LINE to use back camera
+  });
   });
   camera.start();
 }
