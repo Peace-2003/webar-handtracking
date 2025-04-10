@@ -18,23 +18,28 @@ hands.setOptions({
   minTrackingConfidence: 0.7,
 });
 
-// Draw landmarks and connectors
+// Process results from MediaPipe
 hands.onResults((results) => {
+  // Draw the current video frame as a background for debugging.
   canvasCtx.save();
-  canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+  // Draw the video frame so you can see what the camera sees.
+  canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
 
+  // Then optionally, overlay the landmarks.
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
     for (const landmarks of results.multiHandLandmarks) {
+      // Draw connections between landmarks.
       drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {
         color: '#00FF00',
         lineWidth: 2
       });
+      // Draw each landmark.
       drawLandmarks(canvasCtx, landmarks, {
         color: '#FF0000',
         lineWidth: 1
       });
 
-      // Example: detect pinch (between thumb tip and index tip)
+      // Example: detect a pinch gesture (thumb tip vs index tip)
       const thumb = landmarks[4];
       const index = landmarks[8];
       const dx = thumb.x - index.x;
@@ -42,10 +47,10 @@ hands.onResults((results) => {
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < 0.05) {
         console.log("👆 Pinch detected");
+        // You can add any response (e.g., change background, trigger an action) here.
       }
     }
   }
-
   canvasCtx.restore();
 });
 
@@ -65,4 +70,10 @@ function startCamera() {
 document.getElementById('startBtn').addEventListener('click', () => {
   document.getElementById('startBtn').style.display = 'none';
   startCamera();
+});
+
+// Optional: Adjust canvas size on window resize
+window.addEventListener('resize', () => {
+  canvasElement.width = window.innerWidth;
+  canvasElement.height = window.innerHeight;
 });
