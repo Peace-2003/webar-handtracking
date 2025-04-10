@@ -99,14 +99,20 @@ async function startCamera() {
     // Set the stream as video source
     videoElement.srcObject = stream;
     
-    // Initialize the Camera utility after stream is set
+    // DON'T use MediaPipe Camera utility which creates its own stream
+    // Instead, use the raw video stream we already set up
     videoElement.onloadedmetadata = () => {
-      const camera = new Camera(videoElement, {
-        onFrame: async () => {
+      videoElement.play();
+      
+      // Process frames manually using requestAnimationFrame
+      const processFrame = async () => {
+        if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
           await hands.send({image: videoElement});
         }
-      });
-      camera.start();
+        requestAnimationFrame(processFrame);
+      };
+      
+      requestAnimationFrame(processFrame);
     };
     
   } catch (error) {
