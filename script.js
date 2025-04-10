@@ -3,6 +3,38 @@ const canvasElement = document.getElementById('drawing-canvas');
 const canvasCtx = canvasElement.getContext('2d');
 const startBtn = document.getElementById('startBtn');
 
+// Create debug elements
+const debugContainer = document.createElement('div');
+debugContainer.style.position = 'absolute';
+debugContainer.style.top = '10px';
+debugContainer.style.left = '10px';
+debugContainer.style.backgroundColor = 'rgba(0,0,0,0.7)';
+debugContainer.style.color = 'white';
+debugContainer.style.padding = '10px';
+debugContainer.style.fontFamily = 'monospace';
+debugContainer.style.fontSize = '12px';
+debugContainer.style.zIndex = '100';
+debugContainer.style.maxWidth = '80%';
+debugContainer.style.maxHeight = '30%';
+debugContainer.style.overflow = 'auto';
+document.body.appendChild(debugContainer);
+
+// Log function that writes to both console and screen
+function debugLog(message, color = 'white') {
+    console.log(message);
+    const logEntry = document.createElement('div');
+    logEntry.style.color = color;
+    logEntry.style.marginBottom = '5px';
+    logEntry.textContent = typeof message === 'object' ? 
+        JSON.stringify(message) : message;
+    debugContainer.appendChild(logEntry);
+    
+    // Keep only the most recent 10 messages
+    while (debugContainer.children.length > 10) {
+        debugContainer.removeChild(debugContainer.firstChild);
+    }
+}
+
 canvasElement.width = window.innerWidth;
 canvasElement.height = window.innerHeight;
 
@@ -42,7 +74,7 @@ hands.onResults((results) => {
       const dy = thumb.y - index.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < 0.05) {
-        console.log("👆 Pinch detected");
+        debugLog("👆 Pinch detected", "#ffcc00");
       }
     }
   }
@@ -50,93 +82,228 @@ hands.onResults((results) => {
   canvasCtx.restore();
 });
 
-// COMPLETELY NEW CAMERA INITIALIZATION APPROACH
-async function startCamera() {
-  try {
-    // 1. FIRST manually get the stream with exact environment constraint
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { exact: 'environment' },
-        width: { ideal: 640 },
-        height: { ideal: 480 }
-      }
-    });
-    
-    // 2. Manually set the stream to the video element
-    videoElement.srcObject = stream;
-    
-    // 3. Wait for video to be ready to ensure stream is established
-    await new Promise((resolve) => {
-      videoElement.onloadedmetadata = () => {
-        console.log("Video metadata loaded");
-        resolve();
-      };
-    });
-    
-    // 4. Setup MediaPipe Camera ONLY AFTER stream is established
-    //    Don't pass any camera options since we already set the stream
-    const camera = new Camera(videoElement, {
-      onFrame: async () => {
-        await hands.send({ image: videoElement });
-      }
-    });
-    
-    // 5. Monitor for camera changes
-    stream.getVideoTracks().forEach(track => {
-      track.addEventListener('ended', () => {
-        console.log("Camera track ended unexpectedly");
-      });
-    });
-    
-    // 6. Start MediaPipe processing
-    camera.start();
-    
-  } catch (error) {
-    console.error('Error starting camera:', error);
-    
-    // Fallback to try without exact constraint
+// Function to get detailed camera information
+async function getCameraInfo() {
     try {
-      console.log("Trying fallback camera method...");
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment',
-          width: { ideal: 640 },
-          height: { ideal: 480 }
-        }
-      });
-      
-      videoElement.srcObject = stream;
-      
-      await new Promise((resolve) => {
-        videoElement.onloadedmetadata = () => resolve();
-      });
-      
-      const camera = new Camera(videoElement, {
-        onFrame: async () => {
-          await hands.send({ image: videoElement });
-        }
-      });
-      
-      camera.start();
-      
-    } catch (fallbackError) {
-      console.error('Fallback camera also failed:', fallbackError);
-      alert('Unable to access the back camera. Please check permissions and try again.');
-      startBtn.style.display = 'block';
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        
+        debugLog(`Found ${videoDevices.length} camera(s):`, '#00ffff');
+        videoDevices.forEach((device, index) => {
+            debugLog(`${index}: ${device.label || 'unnamed camera'} (${device.deviceId.substring(0,8)}...)`, '#00ffff');
+        });
+        
+        return videoDevices;
+    } catch (error) {
+        debugLog(`Error getting cameras: ${error}`, '#ff0000');
+        return [];
     }
-  }
+}
+
+// Function to monitor video tracks for changes
+function monitorVideoTrack(stream) {
+    if (!stream) return;
+    
+    const tracks = stream.getVideoTracks();
+    if (tracks.length === 0) return;
+    
+    const track = tracks[0];
+    debugLog(`Active track: ${track.label}`, '#00ff00');
+    
+    // Log track settings
+    const settings = track.getSettings();
+    debugLog(`Track settings: ${JSON.stringify({
+        width: settings.width,
+        height: settings.height,
+        deviceId: settings.deviceId ? settings.deviceId.substring(0,8) + '...' : 'none',
+        facingMode: settings.facingMode || 'unknown'
+    })}`, '#00ff00');
+    
+    // Create observer to monitor track changes
+    let lastCheck = settings;
+    
+    // Check for changes every second
+    const trackMonitor = setInterval(() => {
+        if (track.readyState !== 'live') {
+            debugLog(`Track state changed: ${track.readyState}`, '#ff0000');
+            clearInterval(trackMonitor);
+            return;
+        }
+        
+        const newSettings = track.getSettings();
+        if (newSettings.deviceId !== lastCheck.deviceId ||
+            newSettings.facingMode !== lastCheck.facingMode) {
+            debugLog(`❗ CAMERA SWITCHED from ${lastCheck.facingMode || 'unknown'} to ${newSettings.facingMode || 'unknown'}`, '#ff0000');
+            debugLog(`New camera: ${track.label}`, '#ff0000');
+            lastCheck = newSettings;
+        }
+    }, 1000);
+    
+    // Listen for track ending
+    track.addEventListener('ended', () => {
+        debugLog(`❗ Track ended unexpectedly!`, '#ff0000');
+        clearInterval(trackMonitor);
+    });
+    
+    return trackMonitor;
+}
+
+// Camera initialization with troubleshooting
+async function startCamera() {
+    // First get all camera info
+    debugLog("Starting camera initialization", '#ffff00');
+    const videoDevices = await getCameraInfo();
+    
+    // Try 3 different methods to get the back camera:
+    
+    // METHOD 1: Using exact environment constraint
+    try {
+        debugLog("METHOD 1: Trying exact environment constraint", '#ffff00');
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: { exact: 'environment' },
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            }
+        });
+        
+        debugLog("SUCCESS: Got stream with exact environment", '#00ff00');
+        videoElement.srcObject = stream;
+        
+        // Monitor this stream
+        const trackMonitor = monitorVideoTrack(stream);
+        
+        // Verify we have the stream before continuing
+        await new Promise((resolve) => {
+            videoElement.onloadedmetadata = () => {
+                debugLog("Video metadata loaded", '#00ff00');
+                resolve();
+            };
+        });
+        
+        // Continue with MediaPipe Camera initialization
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({ image: videoElement });
+            }
+        });
+        
+        debugLog("Starting MediaPipe Camera", '#ffff00');
+        camera.start();
+        
+        // Check if camera is still using back camera after 3 seconds
+        setTimeout(() => {
+            const currentTrack = videoElement.srcObject.getVideoTracks()[0];
+            const currentSettings = currentTrack.getSettings();
+            debugLog(`Camera after 3s: ${currentTrack.label}`, '#ffff00');
+            debugLog(`Settings after 3s: ${JSON.stringify({
+                facingMode: currentSettings.facingMode || 'unknown',
+                deviceId: currentSettings.deviceId ? currentSettings.deviceId.substring(0,8) + '...' : 'none'
+            })}`, '#ffff00');
+        }, 3000);
+        
+        return;  // Successfully set up camera
+    } catch (error) {
+        debugLog(`METHOD 1 FAILED: ${error.message}`, '#ff0000');
+    }
+    
+    // METHOD 2: Try using the last video device in the list
+    try {
+        if (videoDevices.length > 1) {
+            debugLog("METHOD 2: Trying last device in list (typically back camera)", '#ffff00');
+            const backCamera = videoDevices[videoDevices.length - 1];
+            
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    deviceId: { exact: backCamera.deviceId },
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
+                }
+            });
+            
+            debugLog(`SUCCESS: Got stream with device: ${backCamera.label}`, '#00ff00');
+            videoElement.srcObject = stream;
+            
+            // Monitor this stream
+            monitorVideoTrack(stream);
+            
+            await new Promise((resolve) => {
+                videoElement.onloadedmetadata = () => {
+                    debugLog("Video metadata loaded", '#00ff00');
+                    resolve();
+                };
+            });
+            
+            const camera = new Camera(videoElement, {
+                onFrame: async () => {
+                    await hands.send({ image: videoElement });
+                }
+            });
+            
+            debugLog("Starting MediaPipe Camera", '#ffff00');
+            camera.start();
+            return;  // Successfully set up camera
+        } else {
+            debugLog("METHOD 2 SKIPPED: Not enough video devices", '#ff0000');
+        }
+    } catch (error) {
+        debugLog(`METHOD 2 FAILED: ${error.message}`, '#ff0000');
+    }
+    
+    // METHOD 3: Last resort - try non-exact environment constraint
+    try {
+        debugLog("METHOD 3: Trying non-exact environment constraint", '#ffff00');
+        
+        // Create custom stream without using the Camera utility
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: 'environment',
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            }
+        });
+        
+        debugLog("Got stream with environment", '#00ff00');
+        videoElement.srcObject = stream;
+        
+        // Monitor this stream
+        monitorVideoTrack(stream);
+        
+        await new Promise((resolve) => {
+            videoElement.onloadedmetadata = () => {
+                debugLog("Video metadata loaded", '#00ff00');
+                resolve();
+            };
+        });
+        
+        // Use already configured stream with MediaPipe
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({ image: videoElement });
+            }
+        });
+        
+        debugLog("Starting MediaPipe Camera", '#ffff00');
+        camera.start();
+        
+    } catch (error) {
+        debugLog(`METHOD 3 FAILED: ${error.message}`, '#ff0000');
+        debugLog("All methods failed. Cannot access back camera.", '#ff0000');
+        alert('Unable to access the back camera. Please check permissions.');
+        startBtn.style.display = 'block';
+    }
 }
 
 startBtn.addEventListener('click', () => {
-  startBtn.style.display = 'none';
-  startCamera();
+    startBtn.style.display = 'none';
+    startCamera();
 });
 
 videoElement.addEventListener('playing', () => {
-  console.log("Video started playing");
+    debugLog("Video started playing", '#00ff00');
 });
 
 window.addEventListener('resize', () => {
-  canvasElement.width = window.innerWidth;
-  canvasElement.height = window.innerHeight;
+    canvasElement.width = window.innerWidth;
+    canvasElement.height = window.innerHeight;
 });
