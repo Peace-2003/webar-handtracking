@@ -50,32 +50,80 @@ hands.onResults((results) => {
   canvasCtx.restore();
 });
 
-// Completely replace your startCamera() function with this version:
+// COMPLETELY NEW CAMERA INITIALIZATION APPROACH
 async function startCamera() {
   try {
-    // Don't get the stream first - let the Camera utility handle it
-    // but pass the correct constraints to it
-    
-    const camera = new Camera(videoElement, {
-      onFrame: async () => {
-        await hands.send({image: videoElement});
-      },
-      width: 640,
-      height: 480,
-      // Force environment mode (back camera)
-      cameraOptions: {
-        facingMode: {exact: 'environment'},
-        width: {ideal: 640},
-        height: {ideal: 480}
+    // 1. FIRST manually get the stream with exact environment constraint
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { exact: 'environment' },
+        width: { ideal: 640 },
+        height: { ideal: 480 }
       }
     });
     
+    // 2. Manually set the stream to the video element
+    videoElement.srcObject = stream;
+    
+    // 3. Wait for video to be ready to ensure stream is established
+    await new Promise((resolve) => {
+      videoElement.onloadedmetadata = () => {
+        console.log("Video metadata loaded");
+        resolve();
+      };
+    });
+    
+    // 4. Setup MediaPipe Camera ONLY AFTER stream is established
+    //    Don't pass any camera options since we already set the stream
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        await hands.send({ image: videoElement });
+      }
+    });
+    
+    // 5. Monitor for camera changes
+    stream.getVideoTracks().forEach(track => {
+      track.addEventListener('ended', () => {
+        console.log("Camera track ended unexpectedly");
+      });
+    });
+    
+    // 6. Start MediaPipe processing
     camera.start();
     
   } catch (error) {
     console.error('Error starting camera:', error);
-    alert('Unable to access the camera. Please check permissions and try again.');
-    startBtn.style.display = 'block';
+    
+    // Fallback to try without exact constraint
+    try {
+      console.log("Trying fallback camera method...");
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        }
+      });
+      
+      videoElement.srcObject = stream;
+      
+      await new Promise((resolve) => {
+        videoElement.onloadedmetadata = () => resolve();
+      });
+      
+      const camera = new Camera(videoElement, {
+        onFrame: async () => {
+          await hands.send({ image: videoElement });
+        }
+      });
+      
+      camera.start();
+      
+    } catch (fallbackError) {
+      console.error('Fallback camera also failed:', fallbackError);
+      alert('Unable to access the back camera. Please check permissions and try again.');
+      startBtn.style.display = 'block';
+    }
   }
 }
 
