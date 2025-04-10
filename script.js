@@ -50,70 +50,27 @@ hands.onResults((results) => {
   canvasCtx.restore();
 });
 
-// More reliable approach to get back camera
+// Completely replace your startCamera() function with this version:
 async function startCamera() {
   try {
-    // First try direct device selection
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const videoDevices = devices.filter(device => device.kind === 'videoinput');
-    console.log('Available cameras:', videoDevices.length);
+    // Don't get the stream first - let the Camera utility handle it
+    // but pass the correct constraints to it
     
-    let stream;
-    
-    // If multiple cameras, try to select back camera
-    if (videoDevices.length > 1) {
-      try {
-        // On most mobile devices, back camera is often the last in the list
-        const backCamera = videoDevices[videoDevices.length - 1];
-        console.log('Attempting to use camera:', backCamera.label || 'unnamed camera');
-        
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            deviceId: {exact: backCamera.deviceId},
-            width: 640,
-            height: 480
-          }
-        });
-      } catch (err) {
-        console.log('Device selection failed:', err);
-        // Fall back to environment facing mode constraint
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: {exact: 'environment'},
-            width: 640,
-            height: 480
-          }
-        });
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        await hands.send({image: videoElement});
+      },
+      width: 640,
+      height: 480,
+      // Force environment mode (back camera)
+      cameraOptions: {
+        facingMode: {exact: 'environment'},
+        width: {ideal: 640},
+        height: {ideal: 480}
       }
-    } else {
-      // If only one camera or enumeration not supported
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment',
-          width: 640,
-          height: 480
-        }
-      });
-    }
+    });
     
-    // Set the stream as video source
-    videoElement.srcObject = stream;
-    
-    // DON'T use MediaPipe Camera utility which creates its own stream
-    // Instead, use the raw video stream we already set up
-    videoElement.onloadedmetadata = () => {
-      videoElement.play();
-      
-      // Process frames manually using requestAnimationFrame
-      const processFrame = async () => {
-        if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA) {
-          await hands.send({image: videoElement});
-        }
-        requestAnimationFrame(processFrame);
-      };
-      
-      requestAnimationFrame(processFrame);
-    };
+    camera.start();
     
   } catch (error) {
     console.error('Error starting camera:', error);
