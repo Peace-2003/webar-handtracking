@@ -3,26 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>WebAR Hand Tracking</title>
-  <!-- Link to CSS -->
+  <title>WebAR Hand Tracking with Gesture Recognition</title>
   <link rel="stylesheet" href="style.css" />
-  
-  <!-- MediaPipe Libraries -->
+  <!-- MediaPipe dependencies -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.js"></script>
 </head>
 <body>
-  <!-- Start button to trigger camera access -->
   <button id="startBtn">Start Experience</button>
-  
-  <!-- Video element (for debugging: remove "debug" class later to hide it) -->
-  <video class="input_video debug" autoplay playsinline muted></video>
-  
-  <!-- Canvas to draw video feed and hand landmarks -->
+  <video class="input_video" autoplay playsinline muted></video>
   <canvas id="drawing-canvas"></canvas>
-  
-  <!-- Script file -->
+  <div id="gesture-output" class="gesture-display"></div>
+  <div id="debug-panel" class="debug-panel"></div>
   <script src="script.js"></script>
 </body>
 </html>
