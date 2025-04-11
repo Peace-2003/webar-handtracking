@@ -52,6 +52,7 @@ body, html {
   padding: 10px;
   font-size: 24px;
   font-weight: bold;
+  transition: background-color 0.3s ease;
 }
 
 .debug-panel {
