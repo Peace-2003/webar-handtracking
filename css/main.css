@@ -117,6 +117,17 @@ html, body {
 
 #qr-reader video {
     object-fit: cover;
+    width: 100% !important;
+    height: auto !important;
+}
+
+/* Force the video container to full width */
+#qr-reader__scan_region {
+    width: 100% !important;
+}
+
+#qr-reader canvas {
+    width: 100% !important;
 }
 
 /* Adjust QR reader styles to prevent overflows */
