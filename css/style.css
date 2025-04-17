@@ -196,20 +196,33 @@ h2 {
 
 /* AR view styles - keep scene full size */
 #ar-view {
-    width: 100vw;
-    height: 100vh;
+    width: 100vw !important; /* Force full viewport width */
+    height: 100vh !important; /* Force full viewport height */
+    position: absolute;
+    top: 0;
+    left: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
 }
 
+/* Ensure A-Frame scene fills the viewport */
 #ar-view a-scene {
+    width: 100% !important;
+    height: 100% !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
     z-index: 1;
 }
 
-#ar-view .controls {
-    z-index: 2;
-}
-
-/* Make sure AR.js camera feed appears */
+/* Force the camera component to fill the entire screen */
 .a-canvas {
+    width: 100% !important;
+    height: 100% !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
     z-index: 0 !important;
 }
 
@@ -317,7 +330,31 @@ h2 {
     body {
         height: -webkit-fill-available;
     }
+    
+    #ar-view {
+        position: fixed !important;
+    }
+    
+    .a-canvas {
+        left: 0 !important;
+        width: 100vw !important;
+    }
+    
     video {
         object-position: center;
     }
+}
+
+/* Android specific fixes */
+@supports not (-webkit-touch-callout: none) {
+    #ar-view a-scene {
+        position: fixed !important;
+    }
+}
+
+/* Prevent AR view from getting cut off */
+#ar-view .ar-controls {
+    z-index: 1001;
+    position: fixed;
+    bottom: 20px;
 }

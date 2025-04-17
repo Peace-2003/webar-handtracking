@@ -42,22 +42,24 @@
         </div>
     </div>
     
-    <div id="ar-view" class="view" style="display: none;">
-        <a-scene embedded arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;">
-            <a-marker type="pattern" url="assets/markers/pattern-qr.patt">
-                <a-entity id="book-model" position="0 0.5 0" rotation="-90 0 0">
-                    <!-- AR Book will be placed here -->
-                </a-entity>
-            </a-marker>
-            <a-entity camera></a-entity>
-        </a-scene>
-        
-        <div class="controls ar-controls">
-            <button id="prev-btn-ar" class="nav-btn">Previous</button>
-            <button id="toggle-ar" class="toggle-btn">View Normal</button>
-            <button id="next-btn-ar" class="nav-btn">Next</button>
-        </div>
-    </div>
+<!-- Only the AR view section needs to be modified, the rest stays the same -->
+<div id="ar-view" class="view" style="display: none;">
+  <a-scene embedded arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false; canvasWidth: 100%; canvasHeight: 100%;">
+      <a-marker type="pattern" url="assets/markers/pattern-qr.patt">
+          <a-entity id="book-model" position="0 0.5 0" rotation="-90 0 0">
+              <!-- AR Book will be placed here -->
+          </a-entity>
+      </a-marker>
+      <a-entity camera></a-entity>
+  </a-scene>
+  
+  <div class="controls ar-controls">
+      <button id="prev-btn-ar" class="nav-btn">Previous</button>
+      <button id="toggle-ar" class="toggle-btn">View Normal</button>
+      <button id="next-btn-ar" class="nav-btn">Next</button>
+  </div>
+</div>
+
     
     <div id="book-view" class="view" style="display: none;">
         <div id="flipbook"></div>
