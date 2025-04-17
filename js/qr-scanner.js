@@ -11,17 +11,33 @@ function initQRScanner(onSuccessCallback) {
     const qrReader = document.getElementById('qr-reader');
     const qrResult = document.getElementById('qr-result');
     
-    // Create scanner instance - direct approach without Html5QrcodeScanner
-    const html5QrCode = new Html5Qrcode('qr-reader');
+    // Create a dedicated container for better control
+    qrReader.innerHTML = '<div id="qr-reader-container"></div>';
+    const qrReaderContainer = document.getElementById('qr-reader-container');
     
-    // Configuration for scanner
+    // Create scanner instance directly
+    const html5QrCode = new Html5Qrcode("qr-reader-container", { 
+        formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ] 
+    });
+    
+    // Configuration for scanner with dynamic QR box
     const config = { 
-        fps: 10, 
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0
+        fps: 15,
+        qrbox: function(viewfinderWidth, viewfinderHeight) {
+            // Make QR box 70% of the smaller dimension
+            let minEdgePercentage = 0.7;
+            let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+            let qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
+            return {
+                width: qrboxSize,
+                height: qrboxSize
+            };
+        },
+        aspectRatio: window.innerWidth > window.innerHeight ? 1.2 : 0.8,
+        disableFlip: false
     };
     
-    // Add error display container if it doesn't exist
+    // Add error display container
     if (!document.getElementById('error-container')) {
         const errorContainer = document.createElement('div');
         errorContainer.id = 'error-container';
@@ -42,7 +58,7 @@ function initQRScanner(onSuccessCallback) {
         });
     }
     
-    // Add restart button if it doesn't exist
+    // Add restart button
     if (!document.getElementById('restart-scan-btn')) {
         const restartButton = document.createElement('button');
         restartButton.id = 'restart-scan-btn';
@@ -119,7 +135,37 @@ function initQRScanner(onSuccessCallback) {
                 console.error("Error starting scanner with any camera:", err);
                 showError("camera_error");
             });
+        }).then(() => {
+            // Fix video display after camera starts
+            fixVideoDisplay();
         });
+    }
+    
+    /**
+     * Function to fix video display issues
+     */
+    function fixVideoDisplay() {
+        setTimeout(() => {
+            // Find and adjust the video element
+            const videoElement = document.querySelector('#qr-reader-container video');
+            if (videoElement) {
+                videoElement.style.width = '100%';
+                videoElement.style.height = '100%';
+                videoElement.style.objectFit = 'cover';
+                videoElement.style.left = '0';
+                videoElement.style.top = '0';
+                videoElement.style.transform = 'none';
+                
+                // Adjust scan region if present
+                const scanRegion = document.querySelector('#qr-reader-container div');
+                if (scanRegion) {
+                    scanRegion.style.width = '100%';
+                    scanRegion.style.height = '100%';
+                }
+                
+                console.log('Applied video element style fixes');
+            }
+        }, 1000);
     }
     
     /**

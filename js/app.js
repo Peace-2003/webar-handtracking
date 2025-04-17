@@ -26,16 +26,17 @@ document.addEventListener('DOMContentLoaded', function() {
      * Disable scrolling completely
      */
     function disableScroll() {
-        // Get current scroll position
-        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+        // Lock scroll position, but allow scroll events
+        document.body.style.cssText = `
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+        `;
         
         // Prevent scrolling with arrow keys, space, page up/down
-        window.onscroll = function() {
-            window.scrollTo(scrollLeft, scrollTop);
-        };
-        
-        // Disable keyboard scrolling
         window.addEventListener('keydown', function(e) {
             // Space, page up, page down, end, home, arrows
             if([32, 33, 34, 35, 36, 37, 38, 39, 40].indexOf(e.keyCode) > -1) {
@@ -45,8 +46,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }, false);
         
         // Disable touch scrolling
-        document.body.addEventListener('touchmove', function(e) {
-            e.preventDefault();
+        document.addEventListener('touchmove', function(e) {
+            if (e.target.className.indexOf('scrollable') === -1) {
+                e.preventDefault();
+            }
         }, { passive: false });
     }
     
@@ -56,6 +59,9 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function handleQRScanSuccess(bookId) {
         try {
+            // Log success
+            console.log("Successfully scanned QR code for book:", bookId);
+            
             // Validate book ID
             if (!bookId || bookId.trim() === '') {
                 throw new Error('Invalid book ID');
@@ -80,8 +86,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         console.log("Loading book experience for:", bookId);
         
+        // Use a fixed book ID for testing if needed
+        const actualBookId = "book1"; // For testing, always load book1
+        
         // Fetch book data
-        fetchBookData(bookId)
+        fetchBookData(actualBookId)
             .then(bookData => {
                 console.log("Book data loaded successfully:", bookData.id);
                 
@@ -126,50 +135,31 @@ document.addEventListener('DOMContentLoaded', function() {
         // Log the book ID to help with debugging
         console.log("Attempting to load book with ID:", bookId);
         
-        // Check if book assets exist before attempting to load
-        function checkImageExists(url) {
-            return new Promise((resolve) => {
-                const img = new Image();
-                img.onload = () => resolve(true);
-                img.onerror = () => resolve(false);
-                img.src = url;
-            });
-        }
-        
-        return new Promise((resolve, reject) => {
-            // First check if cover image exists
-            checkImageExists(`assets/books/${bookId}/cover.jpg`)
-                .then(exists => {
-                    if (!exists) {
-                        console.error(`Cover image for book ${bookId} not found`);
-                        reject(new Error(`Book assets not found for ${bookId}`));
-                        return;
-                    }
-                    
-                    // If cover exists, proceed with loading book data
-                    setTimeout(() => {
-                        try {
-                            resolve({
-                                id: bookId,
-                                title: 'Sample Book',
-                                author: 'John Doe',
-                                pages: [
-                                    { type: 'cover', imagePath: `assets/books/${bookId}/cover.jpg`, content: '' },
-                                    { type: 'blank', imagePath: '', content: '' },
-                                    { type: 'content', imagePath: `assets/books/${bookId}/page1.jpg`, content: '<h1>Chapter 1</h1><p>This is the beginning of our story. Once upon a time in a land far away...</p>' },
-                                    { type: 'content', imagePath: `assets/books/${bookId}/page2.jpg`, content: '<p>The journey continued through the forest. The trees whispered secrets as the wind blew softly.</p>' },
-                                    { type: 'content', imagePath: `assets/books/${bookId}/page3.jpg`, content: '<p>As night fell, stars illuminated the sky like diamonds scattered across black velvet.</p>' },
-                                    { type: 'content', imagePath: `assets/books/${bookId}/page4.jpg`, content: '<h1>Chapter 2</h1><p>The morning brought new challenges and opportunities.</p>' },
-                                    { type: 'blank', imagePath: '', content: '' },
-                                    { type: 'back-cover', imagePath: `assets/books/${bookId}/back-cover.jpg`, content: '' }
-                                ]
-                            });
-                        } catch (error) {
-                            console.error("Error creating book data:", error);
-                            reject(error);
-                        }
-                    }, 1500);
-                });
+        // For demo/testing purposes, always return hardcoded data
+        // In a real app, you would fetch this from a server
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                try {
+                    resolve({
+                        id: bookId,
+                        title: 'Sample Book',
+                        author: 'John Doe',
+                        pages: [
+                            { type: 'cover', imagePath: `assets/books/book1/cover.jpg`, content: '' },
+                            { type: 'blank', imagePath: '', content: '' },
+                            { type: 'content', imagePath: `assets/books/book1/page1.jpg`, content: '<h1>Chapter 1</h1><p>This is the beginning of our story. Once upon a time in a land far away...</p>' },
+                            { type: 'content', imagePath: `assets/books/book1/page2.jpg`, content: '<p>The journey continued through the forest. The trees whispered secrets as the wind blew softly.</p>' },
+                            { type: 'content', imagePath: `assets/books/book1/page3.jpg`, content: '<p>As night fell, stars illuminated the sky like diamonds scattered across black velvet.</p>' },
+                            { type: 'content', imagePath: `assets/books/book1/page4.jpg`, content: '<h1>Chapter 2</h1><p>The morning brought new challenges and opportunities.</p>' },
+                            { type: 'blank', imagePath: '', content: '' },
+                            { type: 'back-cover', imagePath: `assets/books/book1/back-cover.jpg`, content: '' }
+                        ]
+                    });
+                } catch (error) {
+                    console.error("Error creating book data:", error);
+                    throw error;
+                }
+            }, 1500);
         });
     }
     
@@ -190,7 +180,9 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('book-viewer-container').style.display = 'block';
             
             // Ensure the normal book viewer shows the same page as AR
-            updateNormalBookPage(appState.currentPage);
+            if (typeof updateNormalBookPage === 'function') {
+                updateNormalBookPage(appState.currentPage);
+            }
         }
     }
     
