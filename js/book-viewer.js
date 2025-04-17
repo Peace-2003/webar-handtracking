@@ -2,90 +2,120 @@
  * Book Viewer Module
  * Handles the normal (non-AR) book viewing experience using Turn.js
  */
-
-/**
- * Initialize the normal book viewer
- * @param {Object} bookData - Book data with pages information
- */
-function initBookViewer(bookData) {
-    const flipbook = $('#flipbook');
+const BookViewer = (function() {
+    // Private variables
+    let currentPage = 0;
+    let totalPages = 0;
+    let bookInitialized = false;
     
-    // Clear any existing content
-    flipbook.empty();
-    
-    // Add pages to the book
-    bookData.pages.forEach((page, index) => {
-        const pageElement = $('<div>');
+    // Initialize the book viewer
+    function init(bookData) {
+        console.log('Initializing book viewer...');
         
-        // Set page class based on type
-        if (page.type === 'cover') {
-            pageElement.addClass('hard cover');
-        } else if (page.type === 'back-cover') {
-            pageElement.addClass('hard back-cover');
-        } else if (page.type === 'blank') {
-            pageElement.addClass('hard');
-        } else {
-            pageElement.addClass('page');
-        }
+        const flipbook = $('#flipbook');
+        flipbook.empty();
         
-        // Add page content
-        const contentDiv = $('<div>').addClass('page-content');
+        // Create book pages
+        bookData.pages.forEach((page, index) => {
+            const pageElement = $('<div>');
+            
+            // Set page class based on type
+            if (page.type === 'cover') {
+                pageElement.addClass('hard cover');
+            } else if (page.type === 'back-cover') {
+                pageElement.addClass('hard back-cover');
+            } else {
+                pageElement.addClass('page');
+            }
+            
+            // Set background image if available
+            if (page.imagePath) {
+                pageElement.css({
+                    backgroundImage: `url(${page.imagePath})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                });
+            }
+            
+            // Add content if available
+            if (page.content) {
+                const contentDiv = $('<div>').addClass('page-content').html(page.content);
+                pageElement.append(contentDiv);
+            }
+            
+            flipbook.append(pageElement);
+        });
         
-        if (page.content) {
-            contentDiv.html(page.content);
-        }
-        
-        if (page.imagePath && page.type !== 'cover' && page.type !== 'back-cover') {
-            contentDiv.css('background-image', `url(${page.imagePath})`);
-            contentDiv.css('background-size', 'cover');
-            contentDiv.css('background-position', 'center');
-        }
-        
-        // Add page number if appropriate
-        if (page.type === 'content') {
-            const pageNumber = $('<div>').addClass('page-number').text(index - 1); // Adjust for cover
-            contentDiv.append(pageNumber);
-        }
-        
-        pageElement.append(contentDiv);
-        flipbook.append(pageElement);
-    });
-    
-    // Initialize Turn.js
-    flipbook.turn({
-        width: 800,
-        height: 600,
-        elevation: 50,
-        gradients: true,
-        autoCenter: true,
-        when: {
-            turning: function(event, page, view) {
-                // Update app state
-                window.appState.currentPage = page - 1;
-                
-                // Update AR view if in AR mode
-                if (window.appState.isARMode && window.updateARBookPage) {
-                    window.updateARBookPage(page - 1);
+        // Initialize Turn.js
+        flipbook.turn({
+            width: window.innerWidth * 0.9,
+            height: window.innerHeight * 0.8,
+            autoCenter: true,
+            when: {
+                turning: function(event, page, view) {
+                    currentPage = page - 1;
                 }
             }
-        }
-    });
-    
-    // Make responsive
-    $(window).resize(function() {
-        resizeBook();
-    }).resize();
-    
-    // Function to resize book based on window
-    function resizeBook() {
-        const width = Math.min($(window).width() * 0.8, 800);
-        const height = width * 0.75;
+        });
         
-        flipbook.turn('size', width, height);
+        // Set total pages
+        totalPages = bookData.pages.length;
+        bookInitialized = true;
+        
+        // Set up event listeners
+        document.getElementById('next-btn-book').addEventListener('click', nextPage);
+        document.getElementById('prev-btn-book').addEventListener('click', prevPage);
+        document.getElementById('toggle-book').addEventListener('click', function() {
+            App.toggleView('ar');
+        });
+        
+        // Window resize handler
+        window.addEventListener('resize', function() {
+            if (bookInitialized) {
+                flipbook.turn('size', window.innerWidth * 0.9, window.innerHeight * 0.8);
+            }
+        });
     }
     
-    // Expose function to update page in normal view
-    window.updateNormalBookPage = function(pageNum) {
-        flipbook.turn('page', pageNum + 1);
+    // Navigate to next page
+    function nextPage() {
+        if (bookInitialized) {
+            $('#flipbook').turn('next');
+            currentPage = $('#flipbook').turn('page') - 1;
+            // Sync with AR view
+            ARViewer.setPage(currentPage);
+        }
+    }
+    
+    // Navigate to previous page
+    function prevPage() {
+        if (bookInitialized) {
+            $('#flipbook').turn('previous');
+            currentPage = $('#flipbook').turn('page') - 1;
+            // Sync with AR view
+            ARViewer.setPage(currentPage);
+        }
+    }
+    
+    // Set current page
+    function setPage(pageNum) {
+        if (bookInitialized && pageNum >= 0 && pageNum < totalPages) {
+            $('#flipbook').turn('page', pageNum + 1);
+            currentPage = pageNum;
+        }
+    }
+    
+    // Get current page
+    function getCurrentPage() {
+        return currentPage;
+    }
+    
+    // Public API
+    return {
+        init: init,
+        nextPage: nextPage,
+        prevPage: prevPage,
+        setPage: setPage,
+        getCurrentPage: getCurrentPage
     };
-}
+})();
