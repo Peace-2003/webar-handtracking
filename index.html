@@ -1,21 +1,82 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>WebAR Hand Tracking with Gesture Recognition</title>
-  <link rel="stylesheet" href="style.css" />
-  <!-- MediaPipe dependencies -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web AR Book Experience</title>
+    
+    <!-- CSS Files -->
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/book.css">
+    <link rel="stylesheet" href="css/ar-controls.css">
+    
+    <!-- External Libraries -->
+    <script src="lib/aframe/aframe.min.js"></script>
+    <script src="lib/ar-js/aframe-ar.js"></script>
+    <script src="lib/jquery/jquery.min.js"></script>
+    <script src="lib/turn-js/turn.min.js"></script>
+    <script src="lib/html5-qrcode/html5-qrcode.min.js"></script>
 </head>
 <body>
-  <button id="startBtn">Start Experience</button>
-  <video class="input_video" autoplay playsinline muted></video>
-  <canvas id="drawing-canvas"></canvas>
-  <div id="gesture-output" class="gesture-display"></div>
-  <div id="debug-panel" class="debug-panel"></div>
-  <script src="script.js"></script>
+    <!-- QR Scanner Section -->
+    <div id="scanner-container">
+        <h2>Scan QR Code to View Book</h2>
+        <div id="qr-reader"></div>
+        <div id="qr-result"></div>
+    </div>
+    
+    <!-- AR Scene Section -->
+    <div id="ar-scene-container" style="display: none;">
+        <a-scene embedded arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;">
+            <a-marker id="book-marker" type="pattern" url="assets/markers/qr-pattern.patt">
+                <a-entity id="book-model" position="0 0.5 0" rotation="-90 0 0">
+                    <!-- AR Book will be rendered here -->
+                </a-entity>
+            </a-marker>
+            <a-entity camera></a-entity>
+        </a-scene>
+        
+        <div id="ar-controls">
+            <button id="prev-btn-ar" class="nav-btn">
+                <img src="assets/icons/prev.svg" alt="Previous">
+            </button>
+            <button id="toggle-mode-btn" class="toggle-btn">
+                <img src="assets/icons/toggle.svg" alt="Toggle AR Mode">
+            </button>
+            <button id="next-btn-ar" class="nav-btn">
+                <img src="assets/icons/next.svg" alt="Next">
+            </button>
+        </div>
+    </div>
+    
+    <!-- Normal Book Viewer Section -->
+    <div id="book-viewer-container" style="display: none;">
+        <div id="flipbook"></div>
+        
+        <div id="normal-controls">
+            <button id="prev-btn-normal" class="nav-btn">
+                <img src="assets/icons/prev.svg" alt="Previous">
+            </button>
+            <button id="toggle-mode-btn-normal" class="toggle-btn">
+                <img src="assets/icons/toggle.svg" alt="Toggle AR Mode">
+            </button>
+            <button id="next-btn-normal" class="nav-btn">
+                <img src="assets/icons/next.svg" alt="Next">
+            </button>
+        </div>
+    </div>
+    
+    <!-- Loading Indicator -->
+    <div id="loading-container" style="display: none;">
+        <div class="spinner"></div>
+        <p>Loading book experience...</p>
+    </div>
+    
+    <!-- JavaScript Files -->
+    <script src="js/qr-scanner.js"></script>
+    <script src="js/ar-book.js"></script>
+    <script src="js/book-viewer.js"></script>
+    <script src="js/book-controller.js"></script>
+    <script src="js/app.js"></script>
 </body>
 </html>
