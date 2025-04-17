@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /* Add this at the end of your existing style.css file */
 
 /* Simple fix for half-screen content issue */
@@ -6,12 +7,237 @@
     height: 100% !important;
 }
 
+=======
+/* Base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    position: fixed;
+    touch-action: none;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f5f5f5;
+}
+
+/* View containers */
+.view {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+h2 {
+    text-align: center;
+    margin: 15px 0;
+    color: #333;
+    font-size: 1.5rem;
+}
+
+/* QR Scanner styles */
+#scanner-view {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: #f0f0f0;
+    padding: 10px;
+    height: 100%;
+}
+
+#camera-container {
+    position: relative;
+    width: 100%;
+    height: 60vh;
+    max-width: 500px;
+    overflow: hidden;
+    background-color: #000;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+#camera-feed {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background-color: #000;
+}
+
+.scan-region-highlight {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 70%;
+    height: 70%;
+    transform: translate(-50%, -50%);
+    border: 3px dashed rgba(255, 255, 255, 0.7);
+    border-radius: 8px;
+    box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.3);
+    z-index: 2;
+    pointer-events: none;
+}
+
+#scanner-message {
+    margin: 10px 0;
+    padding: 10px;
+    text-align: center;
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 4px;
+    color: #333;
+    width: 90%;
+    max-width: 500px;
+}
+
+.main-button {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    font-size: 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-top: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+}
+
+.main-button:hover {
+    background-color: #388E3C;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.main-button:active {
+    transform: translateY(0);
+}
+
+.secondary-button {
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    font-size: 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+/* Camera options */
+#camera-options {
+    margin-top: 10px;
+    text-align: center;
+    width: 90%;
+    max-width: 500px;
+}
+
+#camera-select {
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    margin-right: 10px;
+    width: 70%;
+}
+
+/* Book viewer styles */
+#book-view {
+    background-color: #333;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#flipbook {
+    width: 90%;
+    height: 80%;
+}
+
+.page {
+    background-color: white;
+    overflow: hidden;
+    background-size: cover;
+    background-position: center;
+}
+
+.page-content {
+    padding: 20px;
+    font-size: 16px;
+    line-height: 1.5;
+    color: #333;
+}
+
+/* Control buttons */
+.controls {
+    position: fixed;
+    bottom: 20px;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+
+.nav-btn, .toggle-btn {
+    margin: 0 10px;
+    padding: 12px 24px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.toggle-btn {
+    background-color: #2196F3;
+}
+
+/* AR view styles - keep scene full size */
+#ar-view {
+    width: 100vw !important; /* Force full viewport width */
+    height: 100vh !important; /* Force full viewport height */
+    position: absolute;
+    top: 0;
+    left: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+/* Ensure A-Frame scene fills the viewport */
+#ar-view a-scene {
+    width: 100% !important;
+    height: 100% !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: 1;
+}
+
+/* Force the camera component to fill the entire screen */
+>>>>>>> e7c969c (commit)
 .a-canvas {
     width: 100% !important;
     height: 100% !important;
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
+<<<<<<< HEAD
+=======
+    z-index: 0 !important;
+>>>>>>> e7c969c (commit)
 }
 
 /* Simple fix for book viewer */
@@ -28,7 +254,39 @@
 
 /* Basic full-width fix for iOS */
 @supports (-webkit-touch-callout: none) {
+<<<<<<< HEAD
     #ar-view, #book-view {
         width: 100% !important;
+=======
+    body {
+        height: -webkit-fill-available;
     }
+    
+    #ar-view {
+        position: fixed !important;
+    }
+    
+    .a-canvas {
+        left: 0 !important;
+        width: 100vw !important;
+    }
+    
+    video {
+        object-position: center;
+>>>>>>> e7c969c (commit)
+    }
+}
+
+/* Android specific fixes */
+@supports not (-webkit-touch-callout: none) {
+    #ar-view a-scene {
+        position: fixed !important;
+    }
+}
+
+/* Prevent AR view from getting cut off */
+#ar-view .ar-controls {
+    z-index: 1001;
+    position: fixed;
+    bottom: 20px;
 }
