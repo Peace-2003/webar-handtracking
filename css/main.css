@@ -1,5 +1,42 @@
-/* Add to css/main.css */
+/* Disable scrolling */
+html, body {
+    height: 100%;
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
 
+/* Make all containers fit in the viewport */
+#scanner-container, 
+#ar-scene-container, 
+#book-viewer-container {
+    height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+/* Style adjustments for content inside fixed containers */
+#ar-scene-container a-scene {
+    height: 100vh !important;
+}
+
+#book-viewer-container #flipbook {
+    max-height: 85vh;
+}
+
+/* Ensure controls don't cause overflow */
+#ar-controls, #normal-controls {
+    position: fixed;
+    bottom: 30px;
+    left: 0;
+    width: 100%;
+    z-index: 1000;
+}
+
+/* Error container styling */
 #error-container {
     position: fixed;
     top: 0;
@@ -69,4 +106,25 @@
     background-color: #f8f9fa;
     border-radius: 5px;
     text-align: center;
+}
+
+/* QR reader sizing */
+#qr-reader {
+    width: 100% !important;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+#qr-reader video {
+    object-fit: cover;
+}
+
+/* Adjust QR reader styles to prevent overflows */
+#qr-reader__dashboard_section_swaplink {
+    display: none !important; /* Hide camera swap link */
+}
+
+#qr-reader__status_span {
+    font-size: 14px;
+    margin-top: 10px;
 }

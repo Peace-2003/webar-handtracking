@@ -11,8 +11,15 @@ function initQRScanner(onSuccessCallback) {
     const qrReader = document.getElementById('qr-reader');
     const qrResult = document.getElementById('qr-result');
     
-    // Create scanner instance
-    let html5QrcodeScanner = null;
+    // Create scanner instance - direct approach without Html5QrcodeScanner
+    const html5QrCode = new Html5Qrcode('qr-reader');
+    
+    // Configuration for scanner
+    const config = { 
+        fps: 10, 
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0
+    };
     
     // Add error display container if it doesn't exist
     if (!document.getElementById('error-container')) {
@@ -31,10 +38,7 @@ function initQRScanner(onSuccessCallback) {
         document.getElementById('close-error-btn').addEventListener('click', function() {
             document.getElementById('error-container').style.display = 'none';
             // Restart scanner after closing error
-            if (html5QrcodeScanner) {
-                html5QrcodeScanner.clear();
-                initializeScanner();
-            }
+            startScanner();
         });
     }
     
@@ -50,66 +54,72 @@ function initQRScanner(onSuccessCallback) {
         restartButton.addEventListener('click', function() {
             qrResult.innerHTML = '';
             this.style.display = 'none';
-            if (html5QrcodeScanner) {
-                html5QrcodeScanner.clear();
-                initializeScanner();
-            }
+            startScanner();
         });
     }
     
-    function initializeScanner() {
-        // Clear any previous instances
-        if (html5QrcodeScanner) {
-            html5QrcodeScanner.clear().catch(error => {
-                console.error("Failed to clear scanner instance", error);
+    // Success callback with proper validation
+    const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+        console.log(`QR Code detected: ${decodedText}`, decodedResult);
+        
+        // Validate QR code format
+        if (isValidBookQR(decodedText)) {
+            // Show success message
+            qrResult.innerHTML = `<p class="success">Success! QR Code detected.</p>`;
+            
+            // Stop scanning to save resources
+            html5QrCode.stop().then(() => {
+                console.log("Scanner stopped after successful scan");
+                document.getElementById('restart-scan-btn').style.display = 'block';
+                
+                // Call the success callback with the book ID
+                const bookId = decodedText.split(':')[1];
+                onSuccessCallback(bookId);
+            }).catch(err => {
+                console.error("Failed to stop scanner", err);
+                showError("scanner_error");
+            });
+        } else {
+            // Invalid format - show error but don't stop scanner
+            showError("format_error");
+        }
+    };
+    
+    // Error callback - just log, don't show user error for every frame
+    const qrCodeErrorCallback = (errorMessage) => {
+        // Only log - don't show user error for every frame
+        console.log(`QR scan frame error: ${errorMessage}`);
+    };
+    
+    // Function to start scanner with back camera
+    function startScanner() {
+        // First try to stop any existing scanner instance
+        if (html5QrCode) {
+            html5QrCode.stop().catch(err => {
+                console.log("No active scanner to stop");
             });
         }
         
-        html5QrcodeScanner = new Html5QrcodeScanner(
-            "qr-reader",
-            {
-                fps: 10,
-                qrbox: {width: 250, height: 250},
-                aspectRatio: 1.0,
-                formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE]
-            },
-            /* verbose= */ false
-        );
-        
-        // Success callback with proper validation
-        const qrCodeSuccessCallback = (decodedText, decodedResult) => {
-            console.log(`QR Code detected: ${decodedText}`, decodedResult);
+        // Start scanner with back camera (environment) facing mode
+        html5QrCode.start(
+            { facingMode: "environment" }, // This forces the back camera
+            config,
+            qrCodeSuccessCallback,
+            qrCodeErrorCallback
+        ).catch(err => {
+            console.error("Error starting scanner with back camera:", err);
             
-            // Validate QR code format
-            if (isValidBookQR(decodedText)) {
-                // Show success message
-                qrResult.innerHTML = `<p class="success">Success! QR Code detected.</p>`;
-                
-                // Stop scanning to save resources
-                html5QrcodeScanner.clear().then(() => {
-                    console.log("Scanner stopped after successful scan");
-                    document.getElementById('restart-scan-btn').style.display = 'block';
-                    
-                    // Call the success callback with the book ID
-                    const bookId = decodedText.split(':')[1];
-                    onSuccessCallback(bookId);
-                }).catch(err => {
-                    console.error("Failed to clear scanner", err);
-                });
-            } else {
-                // Invalid format - show error but don't stop scanner
-                showError("format_error");
-            }
-        };
-        
-        // Error callback - just log, don't stop scanner
-        const qrCodeErrorCallback = (errorMessage) => {
-            // Only log - don't show user error for every frame
-            console.log(`QR scan frame error: ${errorMessage}`);
-        };
-        
-        // Render the scanner
-        html5QrcodeScanner.render(qrCodeSuccessCallback, qrCodeErrorCallback);
+            // If environment camera fails, try without specifying camera
+            html5QrCode.start(
+                { facingMode: { ideal: "environment" } }, // Less strict constraint
+                config,
+                qrCodeSuccessCallback,
+                qrCodeErrorCallback
+            ).catch(err => {
+                console.error("Error starting scanner with any camera:", err);
+                showError("camera_error");
+            });
+        });
     }
     
     /**
@@ -137,6 +147,9 @@ function initQRScanner(onSuccessCallback) {
             case "camera_error":
                 errorMessage = "Camera access error. Please check permissions.";
                 break;
+            case "scanner_error":
+                errorMessage = "Error with QR scanner. Please reload the page.";
+                break;
             default:
                 errorMessage = "Could not process QR, please try again with a valid QR code.";
         }
@@ -144,9 +157,6 @@ function initQRScanner(onSuccessCallback) {
         document.getElementById('error-message').textContent = errorMessage;
         document.getElementById('error-container').style.display = 'block';
     }
-    
-    // Initialize the scanner when everything is ready
-    initializeScanner();
     
     // Add instructions
     const instructions = document.createElement('div');
@@ -156,9 +166,12 @@ function initQRScanner(onSuccessCallback) {
     `;
     qrReader.parentNode.insertBefore(instructions, qrReader);
     
+    // Start the scanner with back camera
+    startScanner();
+    
     // Return methods for external control
     return {
-        restart: initializeScanner,
+        restart: startScanner,
         showError: showError
     };
 }

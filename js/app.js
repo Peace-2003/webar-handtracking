@@ -19,6 +19,37 @@ document.addEventListener('DOMContentLoaded', function() {
     // Expose app state to other modules
     window.appState = appState;
     
+    // Disable scrolling
+    disableScroll();
+    
+    /**
+     * Disable scrolling completely
+     */
+    function disableScroll() {
+        // Get current scroll position
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+        
+        // Prevent scrolling with arrow keys, space, page up/down
+        window.onscroll = function() {
+            window.scrollTo(scrollLeft, scrollTop);
+        };
+        
+        // Disable keyboard scrolling
+        window.addEventListener('keydown', function(e) {
+            // Space, page up, page down, end, home, arrows
+            if([32, 33, 34, 35, 36, 37, 38, 39, 40].indexOf(e.keyCode) > -1) {
+                e.preventDefault();
+                return false;
+            }
+        }, false);
+        
+        // Disable touch scrolling
+        document.body.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+    }
+    
     /**
      * Handle successful QR scan
      * @param {string} bookId - Book ID extracted from QR code
@@ -47,11 +78,15 @@ document.addEventListener('DOMContentLoaded', function() {
         showLoading(true);
         appState.currentBookId = bookId;
         
+        console.log("Loading book experience for:", bookId);
+        
         // Fetch book data
         fetchBookData(bookId)
             .then(bookData => {
+                console.log("Book data loaded successfully:", bookData.id);
+                
                 if (!bookData || !bookData.pages || bookData.pages.length === 0) {
-                    throw new Error('Invalid book data');
+                    throw new Error('Invalid book data structure');
                 }
                 
                 appState.totalPages = bookData.pages.length;
@@ -72,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Error loading book:', error);
-                alert('Failed to load book. Please try again.');
+                alert(`Failed to load book: ${error.message}. Please check your QR code and try again.`);
                 showLoading(false);
                 
                 // Reset scanner to allow trying again
@@ -88,26 +123,53 @@ document.addEventListener('DOMContentLoaded', function() {
      * @returns {Promise} - Promise resolving to book data
      */
     function fetchBookData(bookId) {
-        // For demo purposes, return mock data
-        // In a real app, this would be a fetch request to an API
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                resolve({
-                    id: bookId,
-                    title: 'Sample Book',
-                    author: 'John Doe',
-                    pages: [
-                        { type: 'cover', imagePath: 'assets/books/book1/cover.jpg', content: '' },
-                        { type: 'blank', imagePath: '', content: '' },
-                        { type: 'content', imagePath: 'assets/books/book1/page1.jpg', content: '<h1>Chapter 1</h1><p>This is the beginning of our story. Once upon a time in a land far away...</p>' },
-                        { type: 'content', imagePath: 'assets/books/book1/page2.jpg', content: '<p>The journey continued through the forest. The trees whispered secrets as the wind blew softly.</p>' },
-                        { type: 'content', imagePath: 'assets/books/book1/page3.jpg', content: '<p>As night fell, stars illuminated the sky like diamonds scattered across black velvet.</p>' },
-                        { type: 'content', imagePath: 'assets/books/book1/page4.jpg', content: '<h1>Chapter 2</h1><p>The morning brought new challenges and opportunities.</p>' },
-                        { type: 'blank', imagePath: '', content: '' },
-                        { type: 'back-cover', imagePath: 'assets/books/book1/back-cover.jpg', content: '' }
-                    ]
+        // Log the book ID to help with debugging
+        console.log("Attempting to load book with ID:", bookId);
+        
+        // Check if book assets exist before attempting to load
+        function checkImageExists(url) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve(true);
+                img.onerror = () => resolve(false);
+                img.src = url;
+            });
+        }
+        
+        return new Promise((resolve, reject) => {
+            // First check if cover image exists
+            checkImageExists(`assets/books/${bookId}/cover.jpg`)
+                .then(exists => {
+                    if (!exists) {
+                        console.error(`Cover image for book ${bookId} not found`);
+                        reject(new Error(`Book assets not found for ${bookId}`));
+                        return;
+                    }
+                    
+                    // If cover exists, proceed with loading book data
+                    setTimeout(() => {
+                        try {
+                            resolve({
+                                id: bookId,
+                                title: 'Sample Book',
+                                author: 'John Doe',
+                                pages: [
+                                    { type: 'cover', imagePath: `assets/books/${bookId}/cover.jpg`, content: '' },
+                                    { type: 'blank', imagePath: '', content: '' },
+                                    { type: 'content', imagePath: `assets/books/${bookId}/page1.jpg`, content: '<h1>Chapter 1</h1><p>This is the beginning of our story. Once upon a time in a land far away...</p>' },
+                                    { type: 'content', imagePath: `assets/books/${bookId}/page2.jpg`, content: '<p>The journey continued through the forest. The trees whispered secrets as the wind blew softly.</p>' },
+                                    { type: 'content', imagePath: `assets/books/${bookId}/page3.jpg`, content: '<p>As night fell, stars illuminated the sky like diamonds scattered across black velvet.</p>' },
+                                    { type: 'content', imagePath: `assets/books/${bookId}/page4.jpg`, content: '<h1>Chapter 2</h1><p>The morning brought new challenges and opportunities.</p>' },
+                                    { type: 'blank', imagePath: '', content: '' },
+                                    { type: 'back-cover', imagePath: `assets/books/${bookId}/back-cover.jpg`, content: '' }
+                                ]
+                            });
+                        } catch (error) {
+                            console.error("Error creating book data:", error);
+                            reject(error);
+                        }
+                    }, 1500);
                 });
-            }, 1500);
         });
     }
     
