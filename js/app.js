@@ -90,10 +90,10 @@ const App = (function() {
                         title: 'Sample Book',
                         author: 'John Doe',
                         pages: [
-                            { type: 'cover', imagePath: 'assets/books/book1/cover.jpg', content: '' },
-                            { type: 'content', imagePath: 'assets/books/book1/page1.jpg', content: '<h1>Chapter 1</h1><p>This is the beginning of the story...</p>' },
-                            { type: 'content', imagePath: 'assets/books/book1/page2.jpg', content: '<p>The journey continues...</p>' },
-                            { type: 'back-cover', imagePath: 'assets/books/book1/back-cover.jpg', content: '' }
+                            { type: 'cover', imagePath: 'assets/books/book1/cover.png', content: '' },
+                            { type: 'content', imagePath: 'assets/books/book1/page1.png', content: '<h1>Chapter 1</h1><p>This is the beginning of the story...</p>' },
+                            { type: 'content', imagePath: 'assets/books/book1/page2.png', content: '<p>The journey continues...</p>' },
+                            { type: 'back-cover', imagePath: 'assets/books/book1/back-cover.png', content: '' }
                         ]
                     };
                     
