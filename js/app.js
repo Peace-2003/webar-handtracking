@@ -9,32 +9,33 @@ document.addEventListener('DOMContentLoaded', function() {
         currentBookId: null,
         currentPage: 0,
         totalPages: 0,
-        isLoading: false
+        isLoading: false,
+        scanner: null
     };
     
     // Initialize QR scanner
-    initQRScanner(handleQRScanSuccess);
+    appState.scanner = initQRScanner(handleQRScanSuccess);
     
     // Expose app state to other modules
     window.appState = appState;
     
     /**
      * Handle successful QR scan
-     * @param {string} qrData - Data encoded in QR code
+     * @param {string} bookId - Book ID extracted from QR code
      */
-    function handleQRScanSuccess(qrData) {
+    function handleQRScanSuccess(bookId) {
         try {
-            // Parse QR data (expects format: "book:bookId")
-            const dataParts = qrData.split(':');
-            if (dataParts[0] === 'book' && dataParts[1]) {
-                const bookId = dataParts[1];
-                loadBookExperience(bookId);
-            } else {
-                throw new Error('Invalid QR code format');
+            // Validate book ID
+            if (!bookId || bookId.trim() === '') {
+                throw new Error('Invalid book ID');
             }
+            
+            // Load book experience
+            loadBookExperience(bookId);
         } catch (error) {
             console.error('Error processing QR code:', error);
-            alert('Could not process QR code. Please try again with a valid book QR code.');
+            appState.scanner.showError("processing_error");
+            // Don't proceed to loading book experience
         }
     }
     
@@ -49,6 +50,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // Fetch book data
         fetchBookData(bookId)
             .then(bookData => {
+                if (!bookData || !bookData.pages || bookData.pages.length === 0) {
+                    throw new Error('Invalid book data');
+                }
+                
                 appState.totalPages = bookData.pages.length;
                 
                 // Initialize AR book
@@ -69,6 +74,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Error loading book:', error);
                 alert('Failed to load book. Please try again.');
                 showLoading(false);
+                
+                // Reset scanner to allow trying again
+                appState.scanner.restart();
+                document.getElementById('scanner-container').style.display = 'block';
+                document.getElementById('qr-result').innerHTML = '';
             });
     }
     
@@ -134,6 +144,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Expose necessary functions to window for access from other modules
     window.appFunctions = {
         toggleViewMode,
-        showLoading
+        showLoading,
+        restartScanner: function() {
+            if (appState.scanner) {
+                appState.scanner.restart();
+            }
+            document.getElementById('scanner-container').style.display = 'block';
+            document.getElementById('ar-scene-container').style.display = 'none';
+            document.getElementById('book-viewer-container').style.display = 'none';
+        }
     };
 });
