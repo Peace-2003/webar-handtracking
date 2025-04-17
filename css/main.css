@@ -69,6 +69,7 @@ html, body {
     margin: 0 auto;
     overflow: hidden;
     position: relative;
+    background: #000;
 }
 
 #qr-reader-container {
@@ -76,10 +77,40 @@ html, body {
     height: 100% !important;
     position: relative;
     overflow: hidden;
+    background: #000;
+}
+
+/* Camera permission button */
+.permission-btn {
+    background: #2196F3;
+    color: white;
+    border: none;
+    padding: 15px 20px;
+    border-radius: 5px;
+    font-size: 16px;
+    font-weight: bold;
+    margin: 20px auto;
+    display: block;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+}
+
+.permission-btn:hover {
+    background: #0b7dda;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+}
+
+.permission-btn:disabled {
+    background: #cccccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 /* Video element - critical fix */
-#qr-reader-container video {
+#qr-reader-container video,
+video.scanner-video {
     object-fit: cover !important;
     width: 100% !important;
     max-width: 100% !important;
@@ -89,6 +120,22 @@ html, body {
     left: 0 !important;
     top: 0 !important;
     transform: none !important;
+    z-index: 5;
+}
+
+/* QR boundary indicator */
+.qr-boundary {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 70%;
+    height: 70%;
+    border: 2px dashed #ffffff;
+    border-radius: 20px;
+    z-index: 10;
+    box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
 }
 
 /* Scan region container */
@@ -104,6 +151,7 @@ html, body {
     left: 0 !important;
     width: 100% !important;
     height: 100% !important;
+    z-index: 10;
 }
 
 /* QR code result area */
@@ -223,11 +271,9 @@ html, body {
 }
 
 /* Hide unnecessary html5-qrcode elements */
-#qr-reader__status_span {
-    display: none !important;
-}
-
-#qr-reader__dashboard_section_swaplink {
+#qr-reader__status_span,
+#qr-reader__dashboard_section_swaplink,
+#qr-reader__header_message {
     display: none !important;
 }
 
@@ -254,12 +300,38 @@ html, body {
     z-index: 1000;
 }
 
-/* Hide any html5qrcode headers */
-#qr-reader__header_message {
-    display: none !important;
+/* Debug area styling */
+#debug-area {
+    font-family: monospace;
+    font-size: 12px;
+    z-index: 10001;
+}
+
+.log-info {
+    color: #ffffff;
+    margin: 2px 0;
+}
+
+.log-error {
+    color: #ff6b6b;
+    margin: 2px 0;
+}
+
+/* Make debug toggle button more visible */
+#debug-area + button {
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    z-index: 10002;
 }
 
 /* Fix for all possible container issues */
 div#qr-reader *, div#qr-reader-container * {
     box-sizing: border-box !important;
+}
+
+/* For iOS specifics */
+@supports (-webkit-touch-callout: none) {
+    #qr-reader-container video {
+        object-position: center center !important;
+    }
 }

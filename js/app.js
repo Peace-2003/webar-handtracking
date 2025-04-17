@@ -3,6 +3,77 @@
  * Initializes and coordinates the components of the AR Book Experience
  */
 document.addEventListener('DOMContentLoaded', function() {
+    // Debug logging system
+    window.debugLog = function(message, error = null) {
+        const timestamp = new Date().toISOString();
+        const logMessage = `[${timestamp}] ${message}`;
+        
+        console.log(logMessage);
+        
+        // Append to visible debug area
+        const debugArea = document.getElementById('debug-area') || createDebugArea();
+        const logEntry = document.createElement('div');
+        logEntry.className = error ? 'log-error' : 'log-info';
+        logEntry.textContent = error ? `${message}: ${error.message || error}` : message;
+        debugArea.appendChild(logEntry);
+        
+        // Scroll to bottom
+        debugArea.scrollTop = debugArea.scrollHeight;
+        
+        // If error, also log the stack trace
+        if (error && error.stack) {
+            console.error(error.stack);
+        }
+    }
+    
+    function createDebugArea() {
+        const debugArea = document.createElement('div');
+        debugArea.id = 'debug-area';
+        debugArea.style.cssText = `
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 10px;
+            overflow-y: auto;
+            z-index: 9999;
+            display: none;
+        `;
+        
+        const toggleButton = document.createElement('button');
+        toggleButton.textContent = 'Show Debug';
+        toggleButton.style.cssText = `
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            z-index: 10000;
+            padding: 5px 10px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        `;
+        toggleButton.addEventListener('click', function() {
+            const debugArea = document.getElementById('debug-area');
+            if (debugArea.style.display === 'none') {
+                debugArea.style.display = 'block';
+                this.textContent = 'Hide Debug';
+            } else {
+                debugArea.style.display = 'none';
+                this.textContent = 'Show Debug';
+            }
+        });
+        
+        document.body.appendChild(debugArea);
+        document.body.appendChild(toggleButton);
+        return debugArea;
+    }
+    
     // Application state
     const appState = {
         isARMode: true,
@@ -13,6 +84,13 @@ document.addEventListener('DOMContentLoaded', function() {
         scanner: null
     };
     
+    debugLog("Application starting");
+    debugLog(`Browser: ${navigator.userAgent}`);
+    debugLog(`Screen: ${window.innerWidth}x${window.innerHeight}`);
+    
+    // Check camera capabilities
+    checkCameraCapabilities();
+    
     // Initialize QR scanner
     appState.scanner = initQRScanner(handleQRScanSuccess);
     
@@ -21,6 +99,38 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Disable scrolling
     disableScroll();
+    
+    /**
+     * Check camera capabilities before initializing scanner
+     */
+    function checkCameraCapabilities() {
+        debugLog("Checking camera capabilities");
+        
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            debugLog("getUserMedia is not supported in this browser", new Error("API not available"));
+            return false;
+        }
+        
+        // List available media devices
+        if (navigator.mediaDevices.enumerateDevices) {
+            navigator.mediaDevices.enumerateDevices()
+                .then(devices => {
+                    const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                    debugLog(`Found ${videoDevices.length} video input devices`);
+                    
+                    videoDevices.forEach((device, index) => {
+                        debugLog(`Camera ${index+1}: ${device.label || 'Unnamed camera'} (${device.deviceId.substring(0, 10)}...)`);
+                    });
+                })
+                .catch(err => {
+                    debugLog("Failed to enumerate devices", err);
+                });
+        } else {
+            debugLog("enumerateDevices not supported");
+        }
+        
+        return true;
+    }
     
     /**
      * Disable scrolling completely
@@ -51,6 +161,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.preventDefault();
             }
         }, { passive: false });
+        
+        debugLog("Scroll disabled");
     }
     
     /**
@@ -60,7 +172,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleQRScanSuccess(bookId) {
         try {
             // Log success
-            console.log("Successfully scanned QR code for book:", bookId);
+            debugLog("Successfully scanned QR code for book:", bookId);
             
             // Validate book ID
             if (!bookId || bookId.trim() === '') {
@@ -70,7 +182,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Load book experience
             loadBookExperience(bookId);
         } catch (error) {
-            console.error('Error processing QR code:', error);
+            debugLog('Error processing QR code:', error);
             appState.scanner.showError("processing_error");
             // Don't proceed to loading book experience
         }
@@ -84,7 +196,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showLoading(true);
         appState.currentBookId = bookId;
         
-        console.log("Loading book experience for:", bookId);
+        debugLog("Loading book experience for:", bookId);
         
         // Use a fixed book ID for testing if needed
         const actualBookId = "book1"; // For testing, always load book1
@@ -92,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Fetch book data
         fetchBookData(actualBookId)
             .then(bookData => {
-                console.log("Book data loaded successfully:", bookData.id);
+                debugLog("Book data loaded successfully:", bookData.id);
                 
                 if (!bookData || !bookData.pages || bookData.pages.length === 0) {
                     throw new Error('Invalid book data structure');
@@ -115,7 +227,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 showLoading(false);
             })
             .catch(error => {
-                console.error('Error loading book:', error);
+                debugLog('Error loading book:', error);
                 alert(`Failed to load book: ${error.message}. Please check your QR code and try again.`);
                 showLoading(false);
                 
@@ -133,7 +245,7 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function fetchBookData(bookId) {
         // Log the book ID to help with debugging
-        console.log("Attempting to load book with ID:", bookId);
+        debugLog("Attempting to load book with ID:", bookId);
         
         // For demo/testing purposes, always return hardcoded data
         // In a real app, you would fetch this from a server
@@ -156,7 +268,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         ]
                     });
                 } catch (error) {
-                    console.error("Error creating book data:", error);
+                    debugLog("Error creating book data:", error);
                     throw error;
                 }
             }, 1500);
@@ -174,10 +286,12 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('scanner-container').style.display = 'none';
             document.getElementById('ar-scene-container').style.display = 'block';
             document.getElementById('book-viewer-container').style.display = 'none';
+            debugLog("Switched to AR mode");
         } else {
             document.getElementById('scanner-container').style.display = 'none';
             document.getElementById('ar-scene-container').style.display = 'none';
             document.getElementById('book-viewer-container').style.display = 'block';
+            debugLog("Switched to normal book view mode");
             
             // Ensure the normal book viewer shows the same page as AR
             if (typeof updateNormalBookPage === 'function') {
@@ -193,6 +307,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function showLoading(show) {
         appState.isLoading = show;
         document.getElementById('loading-container').style.display = show ? 'flex' : 'none';
+        debugLog(show ? "Loading indicator shown" : "Loading indicator hidden");
     }
     
     // Expose necessary functions to window for access from other modules
@@ -200,6 +315,7 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleViewMode,
         showLoading,
         restartScanner: function() {
+            debugLog("Restarting scanner");
             if (appState.scanner) {
                 appState.scanner.restart();
             }
