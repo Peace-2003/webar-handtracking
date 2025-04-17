@@ -16,16 +16,30 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/3/turn.min.js"></script>
 </head>
 <body>
+    <!-- Debug panel -->
+    <div id="debug-panel" class="debug-panel">
+        <div id="debug-info">Status: Starting...</div>
+        <button id="debug-toggle">Hide Debug</button>
+    </div>
+    
     <!-- Main sections of the app -->
     <div id="scanner-view" class="view">
         <h2>Scan Book QR Code</h2>
         <div id="camera-container">
-            <video id="camera-feed" playsinline autoplay></video>
+            <video id="camera-feed" autoplay playsinline muted></video>
             <canvas id="camera-canvas" style="display: none;"></canvas>
             <div class="scan-region-highlight"></div>
         </div>
-        <div id="scanner-message">Position the QR code in the center</div>
-        <button id="camera-permission">Start Camera</button>
+        <div id="scanner-message">Click button below to start camera</div>
+        <button id="camera-permission" class="main-button">Start Camera</button>
+        
+        <!-- Camera options (added for troubleshooting) -->
+        <div id="camera-options" style="display: none;">
+            <select id="camera-select">
+                <option value="">Select Camera</option>
+            </select>
+            <button id="switch-camera" class="secondary-button">Switch Camera</button>
+        </div>
     </div>
     
     <div id="ar-view" class="view" style="display: none;">
@@ -59,6 +73,15 @@
     <div id="loading-indicator" style="display: none;">
         <div class="spinner"></div>
         <p>Loading...</p>
+    </div>
+    
+    <!-- Error message dialog -->
+    <div id="error-dialog" style="display: none;">
+        <div class="error-content">
+            <h3>Error</h3>
+            <p id="error-message">An error occurred.</p>
+            <button id="error-close" class="main-button">Close</button>
+        </div>
     </div>
     
     <!-- JavaScript -->
