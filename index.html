@@ -68,7 +68,7 @@
   <div id="ui-container">
     <div class="ui-button" id="btn-help">Help</div>
     <div class="ui-button" id="btn-toggle-audio">Sound: OFF</div>
-    <div class="ui-button" id="btn-toggle-motion">Motion: OFF</div>
+    <div class="ui-button" id="btn-toggle-motion">Motion: ON</div>
   </div>
   <div id="info-box" class="info-box">
     Point your camera at one of the target patterns to see the AR content
@@ -94,7 +94,7 @@
     // Add device motion tracking component
     AFRAME.registerComponent('motion-tracking', {
       schema: {
-        enabled: { default: false }
+        enabled: { default: true } // Changed to true by default
       },
       
       init: function() {
@@ -225,7 +225,7 @@
     });
   </script>
 
-  <a-scene mindar-image="imageTargetSrc: ./targets/targets.mind; maxTrack: 3; filterMinCF:0.001; filterBeta: 1000" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+  <a-scene mindar-image="imageTargetSrc: ./targets/targets.mind; maxTrack: 3; filterMinCF:0.0001; filterBeta: 10000; warmupTolerance: 5; missTolerance: 10" color-space="sRGB" renderer="colorManagement: true; physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false" loading-screen="enabled: false">
     <a-assets>
       <!-- Add 3D models, textures, sounds, etc. -->
       <audio id="sound-1" src="assets/sound1.mp3" preload="auto"></audio>
@@ -233,10 +233,10 @@
       <audio id="sound-3" src="assets/sound3.mp3" preload="auto"></audio>
     </a-assets>
 
-    <a-camera position="0 0 0" look-controls="enabled: false" motion-tracking="enabled: false"></a-camera>
+    <a-camera position="0 0 0" look-controls="enabled: false" motion-tracking="enabled: true"></a-camera>
     
     <!-- Anchor-independent AR content container that will persist -->
-    <a-entity id="ar-content" position="0 0 -1" visible="false">
+    <a-entity id="ar-content" position="0 0 -0.5" visible="false">
       <a-entity id="content-pattern1" visible="false">
         <a-box id="box1" position="0 0.1 0" rotation="0 0 0" scale="0.1 0.1 0.1" color="red" animation="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear;">
           <a-animation begin="click" attribute="scale" to="0.15 0.15 0.15" dur="300" direction="alternate" repeat="1"></a-animation>
@@ -265,15 +265,15 @@
     
     <!-- Pattern trackers that will update the position of the AR content -->
     <a-entity id="target1" mindar-image-target="targetIndex: 0">
-      <a-entity position="0 0 0" sound="src: #sound-1; autoplay: false; loop: false;"></a-entity>
+      <a-box visible="false" position="0 0 0" color="red" opacity="0.5"></a-box>
     </a-entity>
     
     <a-entity id="target2" mindar-image-target="targetIndex: 1">
-      <a-entity position="0 0 0" sound="src: #sound-2; autoplay: false; loop: false;"></a-entity>
+      <a-box visible="false" position="0 0 0" color="blue" opacity="0.5"></a-box>
     </a-entity>
     
     <a-entity id="target3" mindar-image-target="targetIndex: 2">
-      <a-entity position="0 0 0" sound="src: #sound-3; autoplay: false; loop: false;"></a-entity>
+      <a-box visible="false" position="0 0 0" color="green" opacity="0.5"></a-box>
     </a-entity>
   </a-scene>
 </body>
