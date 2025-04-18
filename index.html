@@ -87,8 +87,111 @@
       activeContent: null,
       lastWorldPosition: new THREE.Vector3(),
       lastWorldQuaternion: new THREE.Quaternion(),
-      hasDetectedPattern: false
+      hasDetectedPattern: false,
+      // Add a list of all content entities for better management
+      contentEntities: [],
+      persistentParents: [],
+      // Current active pattern (or -1 if none)
+      currentPattern: -1
     };
+    
+    // Robust content manager to handle pattern switching and persistence
+    AFRAME.registerSystem('ar-content-manager', {
+      init: function() {
+        this.sceneEl = this.el;
+        this.currentActivePattern = -1;
+        this.contentEntities = [];
+        this.persistentParents = [];
+        this.activePatternDisplay = document.getElementById('active-pattern');
+        
+        // Listen for all target events
+        this.sceneEl.addEventListener('targetFound', this.onTargetFound.bind(this));
+        this.sceneEl.addEventListener('targetLost', this.onTargetLost.bind(this));
+        
+        console.log('[AR Content Manager] Initialized');
+      },
+      
+      registerContent: function(contentEntity, persistentParent, targetIndex) {
+        this.contentEntities[targetIndex] = contentEntity;
+        this.persistentParents[targetIndex] = persistentParent;
+        console.log(`[AR Content Manager] Registered content for pattern ${targetIndex}`);
+        
+        // Store in global state for access by other components
+        window.arPersistence.contentEntities[targetIndex] = contentEntity;
+        window.arPersistence.persistentParents[targetIndex] = persistentParent;
+      },
+      
+      onTargetFound: function(event) {
+        const foundTargetIndex = parseInt(event.detail.name);
+        console.log(`[AR Content Manager] Target ${foundTargetIndex} found`);
+        
+        // Set as current active pattern
+        this.currentActivePattern = foundTargetIndex;
+        window.arPersistence.currentPattern = foundTargetIndex;
+        
+        // Update the UI
+        this.activePatternDisplay.textContent = `Active Pattern: ${foundTargetIndex + 1}`;
+        
+        // Show the appropriate content, hide others if needed
+        this.showPatternContent(foundTargetIndex);
+      },
+      
+      onTargetLost: function(event) {
+        const lostTargetIndex = parseInt(event.detail.name);
+        console.log(`[AR Content Manager] Target ${lostTargetIndex} lost`);
+        
+        // Don't hide content, it should persist
+        // Just update UI if needed
+        this.activePatternDisplay.textContent = `Pattern ${lostTargetIndex + 1} (tracking with motion)`;
+      },
+      
+      showPatternContent: function(targetIndex) {
+        // First make sure all persistent parents are handled correctly
+        for (let i = 0; i < this.persistentParents.length; i++) {
+          const parent = this.persistentParents[i];
+          if (!parent) continue;
+          
+          if (i === targetIndex) {
+            // Show this content
+            parent.object3D.visible = true;
+            parent.setAttribute('visible', true);
+          } else {
+            // Hide other content only if it's a different pattern
+            // This ensures content persists until another pattern is detected
+            parent.object3D.visible = false;
+            parent.setAttribute('visible', false);
+          }
+        }
+        
+        // Extra check to ensure active content stays visible
+        const activeParent = this.persistentParents[targetIndex];
+        if (activeParent) {
+          activeParent.object3D.visible = true;
+          
+          // Also make sure the content itself is visible
+          const content = this.contentEntities[targetIndex];
+          if (content) {
+            content.object3D.visible = true;
+            content.setAttribute('visible', true);
+          }
+        }
+      },
+      
+      tick: function() {
+        // Force visibility of current pattern content even if something tries to hide it
+        if (this.currentActivePattern >= 0) {
+          const activeParent = this.persistentParents[this.currentActivePattern];
+          if (activeParent && !activeParent.object3D.visible) {
+            activeParent.object3D.visible = true;
+          }
+          
+          const content = this.contentEntities[this.currentActivePattern];
+          if (content && !content.object3D.visible) {
+            content.object3D.visible = true;
+          }
+        }
+      }
+    });
     
     // Component to decouple AR content from pattern targets
     AFRAME.registerComponent('ar-content', {
@@ -99,19 +202,29 @@
       
       init: function() {
         this.sceneEl = document.querySelector('a-scene');
+        this.contentManager = this.sceneEl.systems['ar-content-manager'];
         this.cameraEl = document.querySelector('a-camera');
         this.targetEntity = document.querySelector(`#target${this.data.targetIndex + 1}`);
         this.worldPosition = new THREE.Vector3();
         this.worldQuaternion = new THREE.Quaternion();
         this.targetDetected = false;
         this.wasEverVisible = false;
-        this.decoupled = false; // Track if content has been decoupled
+        this.decoupled = false;
         
         // Create a parent for the content that will be decoupled from pattern tracking
         this.persistentParent = document.createElement('a-entity');
         this.persistentParent.setAttribute('id', `persistent-parent-${this.data.targetIndex}`);
         this.persistentParent.setAttribute('visible', 'false');
+        this.persistentParent.setAttribute('position', '0 0 0');
+        this.persistentParent.setAttribute('rotation', '0 0 0');
         this.sceneEl.appendChild(this.persistentParent);
+        
+        // Register with the content manager
+        if (this.contentManager) {
+          this.contentManager.registerContent(this.el, this.persistentParent, this.data.targetIndex);
+        } else {
+          console.error(`[AR Content ${this.data.targetIndex}] Content manager not found`);
+        }
         
         // Bind event handlers to this instance
         this.onTargetFound = this.onTargetFound.bind(this);
@@ -121,21 +234,14 @@
         this.sceneEl.addEventListener('targetFound', this.onTargetFound);
         this.sceneEl.addEventListener('targetLost', this.onTargetLost);
         
-        console.log(`AR Content ${this.data.targetIndex} initialized`);
-      },
-      
-      update: function() {
-        // If we've been initialized but aren't visible, force visibility
-        if (this.data.initialized && !this.el.object3D.visible) {
-          this.el.object3D.visible = true;
-        }
+        console.log(`[AR Content ${this.data.targetIndex}] Initialized`);
       },
       
       onTargetFound: function(event) {
         const foundTargetIndex = parseInt(event.detail.name);
         if (foundTargetIndex !== this.data.targetIndex) return;
         
-        console.log(`Pattern ${this.data.targetIndex} found`);
+        console.log(`[AR Content ${this.data.targetIndex}] Pattern detected`);
         this.targetDetected = true;
         this.wasEverVisible = true;
         
@@ -144,18 +250,21 @@
         this.el.setAttribute('visible', true);
         
         // Get world position and rotation of the target
-        this.targetEntity.object3D.getWorldPosition(this.worldPosition);
-        this.targetEntity.object3D.getWorldQuaternion(this.worldQuaternion);
-        
-        // Store in global state
-        window.arPersistence.lastWorldPosition.copy(this.worldPosition);
-        window.arPersistence.lastWorldQuaternion.copy(this.worldQuaternion);
-        window.arPersistence.activeContent = this.data.targetIndex;
-        window.arPersistence.hasDetectedPattern = true;
+        if (this.targetEntity && this.targetEntity.object3D) {
+          this.targetEntity.object3D.updateMatrixWorld();
+          this.targetEntity.object3D.getWorldPosition(this.worldPosition);
+          this.targetEntity.object3D.getWorldQuaternion(this.worldQuaternion);
+          
+          // Store in global state
+          window.arPersistence.lastWorldPosition.copy(this.worldPosition);
+          window.arPersistence.lastWorldQuaternion.copy(this.worldQuaternion);
+          window.arPersistence.activeContent = this.data.targetIndex;
+          window.arPersistence.hasDetectedPattern = true;
+        }
         
         // If not already decoupled, decouple this content from the target
         if (!this.decoupled) {
-          this.decoupleContent();
+          setTimeout(() => this.decoupleContent(), 50);
         }
       },
       
@@ -163,43 +272,58 @@
         const lostTargetIndex = parseInt(event.detail.name);
         if (lostTargetIndex !== this.data.targetIndex) return;
         
-        console.log(`Pattern ${this.data.targetIndex} lost, but content remains visible`);
+        console.log(`[AR Content ${this.data.targetIndex}] Pattern lost, but content remains visible`);
         this.targetDetected = false;
+        
+        // Explicitly keep content visible unless another pattern is detected
+        if (this.persistentParent) {
+          this.persistentParent.object3D.visible = true;
+          this.persistentParent.setAttribute('visible', true);
+        }
+        
+        this.el.object3D.visible = true;
+        this.el.setAttribute('visible', true);
       },
       
       decoupleContent: function() {
         if (this.decoupled) return;
         
-        // Clone this entity's position/rotation to the persistent parent
-        this.persistentParent.object3D.position.copy(this.worldPosition);
-        this.persistentParent.object3D.quaternion.copy(this.worldQuaternion);
-        this.persistentParent.setAttribute('visible', true);
-        
-        // Move this entity to be a child of the persistent parent
-        const currentParent = this.el.parentNode;
-        currentParent.removeChild(this.el);
-        this.persistentParent.appendChild(this.el);
-        
-        // Reset local position so it appears in the same world position
-        this.el.object3D.position.set(0, 0, 0);
-        this.el.object3D.rotation.set(0, 0, 0);
-        
-        // Mark as decoupled
-        this.decoupled = true;
-        console.log(`Content ${this.data.targetIndex} decoupled from target`);
+        try {
+          // Clone this entity's position/rotation to the persistent parent
+          this.persistentParent.object3D.position.copy(this.worldPosition);
+          this.persistentParent.object3D.quaternion.copy(this.worldQuaternion);
+          this.persistentParent.setAttribute('visible', true);
+          
+          // Move this entity to be a child of the persistent parent
+          const currentParent = this.el.parentNode;
+          if (currentParent) {
+            currentParent.removeChild(this.el);
+            this.persistentParent.appendChild(this.el);
+            
+            // Reset local position so it appears in the same world position
+            this.el.object3D.position.set(0, 0, 0);
+            this.el.object3D.rotation.set(0, 0, 0);
+            
+            // Mark as decoupled
+            this.decoupled = true;
+            console.log(`[AR Content ${this.data.targetIndex}] Successfully decoupled from target`);
+          } else {
+            console.error(`[AR Content ${this.data.targetIndex}] Cannot decouple: no parent found`);
+          }
+        } catch (error) {
+          console.error(`[AR Content ${this.data.targetIndex}] Decoupling error:`, error);
+        }
       },
       
       tick: function() {
-        // Always ensure visibility if it was ever visible before
-        if (this.wasEverVisible && !this.el.object3D.visible) {
-          this.el.object3D.visible = true;
-          this.el.setAttribute('visible', true);
-        }
-        
-        // Ensure our parent is also visible
-        if (this.persistentParent && this.wasEverVisible) {
-          this.persistentParent.object3D.visible = true;
-          this.persistentParent.setAttribute('visible', true);
+        // Always ensure our content is visible if it should be
+        if (this.wasEverVisible && this.data.targetIndex === window.arPersistence.currentPattern) {
+          if (!this.el.object3D.visible) {
+            this.el.object3D.visible = true;
+          }
+          if (this.persistentParent && !this.persistentParent.object3D.visible) {
+            this.persistentParent.object3D.visible = true;
+          }
         }
       },
       
@@ -223,21 +347,11 @@
         this.isCalibrated = false;
         this.orientationOffset = new THREE.Euler(0, 0, 0, 'YXZ');
         this.lastTimestamp = 0;
-        this.persistentParents = [];
         
         this.deviceMotionHandler = this.deviceMotionHandler.bind(this);
         this.deviceOrientationHandler = this.deviceOrientationHandler.bind(this);
         
-        // Find all persistent AR content parents
-        setTimeout(() => {
-          this.persistentParents = [
-            document.getElementById('persistent-parent-0'),
-            document.getElementById('persistent-parent-1'),
-            document.getElementById('persistent-parent-2')
-          ];
-          console.log('Motion tracking initialized with persistent parents:', 
-                      this.persistentParents.filter(Boolean).length);
-        }, 1000);
+        console.log('[Motion Tracking] Component initialized');
       },
       
       update: function() {
@@ -337,20 +451,23 @@
       tick: function() {
         if (!this.data.enabled || !this.isCalibrated || !window.arPersistence.hasDetectedPattern) return;
         
+        // Get current active pattern index
+        const activePatternIndex = window.arPersistence.currentPattern;
+        if (activePatternIndex < 0) return;
+        
+        // Get the persistent parent of the active pattern
+        const activeParent = window.arPersistence.persistentParents[activePatternIndex];
+        if (!activeParent || !activeParent.object3D) return;
+        
         // Calculate orientation difference from last frame
         const deltaAlpha = this.deviceOrientation.alpha - this.lastDeviceOrientation.alpha;
         const deltaBeta = this.deviceOrientation.beta - this.lastDeviceOrientation.beta;
         const deltaGamma = this.deviceOrientation.gamma - this.lastDeviceOrientation.gamma;
         
-        // Apply device motion to all persistent parent entities
-        this.persistentParents.forEach(parent => {
-          if (parent && parent.object3D.visible) {
-            // Apply rotations based on device movement (faster response rate)
-            parent.object3D.rotation.y -= deltaAlpha * 0.8;
-            parent.object3D.rotation.x += deltaBeta * 0.8;
-            parent.object3D.rotation.z += deltaGamma * 0.8;
-          }
-        });
+        // Apply device motion to the active pattern's persistent parent
+        activeParent.object3D.rotation.y -= deltaAlpha * 0.8;
+        activeParent.object3D.rotation.x += deltaBeta * 0.8;
+        activeParent.object3D.rotation.z += deltaGamma * 0.8;
       },
       
       remove: function() {
@@ -360,7 +477,8 @@
   </script>
 
   <!-- Optimized A-Frame scene with better detection parameters -->
-  <a-scene mindar-image="imageTargetSrc: ./targets/targets.mind; maxTrack: 3; filterMinCF:0.00001; filterBeta: 0.1; warmupTolerance: 15; missTolerance: 20" 
+  <a-scene ar-content-manager
+    mindar-image="imageTargetSrc: ./targets/targets.mind; maxTrack: 3; filterMinCF:0.00001; filterBeta: 0.1; warmupTolerance: 15; missTolerance: 20" 
     color-space="sRGB" 
     renderer="antialias: false; precision: medium; colorManagement: true; physicallyCorrectLights: false" 
     vr-mode-ui="enabled: false" 
