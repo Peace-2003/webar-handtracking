@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>AR Target Pattern Generator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .pattern {
+      width: 512px;
+      height: 512px;
+      margin: 20px 0;
+      border: 1px solid #000;
+      position: relative;
+    }
+    .instructions {
+      margin-bottom: 30px;
+    }
+    h1 {
+      color: #333;
+    }
+    .pattern-1 {
+      background: linear-gradient(45deg, #f00 25%, transparent 25%, transparent 75%, #f00 75%),
+                  linear-gradient(45deg, #f00 25%, transparent 25%, transparent 75%, #f00 75%);
+      background-size: 100px 100px;
+      background-position: 0 0, 50px 50px;
+    }
+    .pattern-1::after {
+      content: "1";
+      position: absolute;
+      font-size: 120px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: black;
+    }
+    .pattern-2 {
+      background: radial-gradient(circle, #00f 20%, transparent 20%),
+                  radial-gradient(circle, #00f 20%, transparent 20%);
+      background-size: 100px 100px;
+      background-position: 0 0, 50px 50px;
+    }
+    .pattern-2::after {
+      content: "2";
+      position: absolute;
+      font-size: 120px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: black;
+    }
+    .pattern-3 {
+      background: 
+        repeating-linear-gradient(
+          0deg,
+          #0f0,
+          #0f0 20px,
+          transparent 20px,
+          transparent 40px
+        ),
+        repeating-linear-gradient(
+          90deg,
+          #0f0,
+          #0f0 20px,
+          transparent 20px,
+          transparent 40px
+        );
+    }
+    .pattern-3::after {
+      content: "3";
+      position: absolute;
+      font-size: 120px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: black;
+    }
+  </style>
+</head>
+<body>
+  <h1>AR Target Pattern Generator</h1>
+  
+  <div class="instructions">
+    <p>Right-click on each pattern below and select "Save Image" to save the patterns as PNG files.</p>
+    <p>Then upload these images to the <a href="https://hiukim.github.io/mind-ar-js-doc/tools/compile/" target="_blank">MindAR Image Compiler</a> to generate your targets.mind file.</p>
+  </div>
+  
+  <h2>Pattern 1 (Red Checkerboard)</h2>
+  <div class="pattern pattern-1" id="pattern1"></div>
+  
+  <h2>Pattern 2 (Blue Dots)</h2>
+  <div class="pattern pattern-2" id="pattern2"></div>
+  
+  <h2>Pattern 3 (Green Lines)</h2>
+  <div class="pattern pattern-3" id="pattern3"></div>
+  
+  <script>
+    // Add functionality to download patterns as images
+    document.querySelectorAll('.pattern').forEach((pattern, index) => {
+      pattern.addEventListener('click', () => {
+        // In a real implementation, you would use html2canvas or similar
+        // to convert the div to an image for download
+        alert(`Right-click on Pattern ${index + 1} and select "Save image as..." to save it`);
+      });
+    });
+  </script>
+</body>
+</html>
