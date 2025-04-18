@@ -51,6 +51,16 @@
       z-index: 100;
       display: none;
     }
+    #active-pattern {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background-color: rgba(255, 255, 255, 0.7);
+      padding: 10px;
+      border-radius: 5px;
+      font-family: Arial, sans-serif;
+      z-index: 100;
+    }
   </style>
 </head>
 <body>
@@ -58,17 +68,164 @@
   <div id="ui-container">
     <div class="ui-button" id="btn-help">Help</div>
     <div class="ui-button" id="btn-toggle-audio">Sound: OFF</div>
+    <div class="ui-button" id="btn-toggle-motion">Motion: OFF</div>
   </div>
   <div id="info-box" class="info-box">
     Point your camera at one of the target patterns to see the AR content
   </div>
+  <div id="active-pattern">No pattern detected</div>
   
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.1/dist/mindar-image.prod.js"></script>
   <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.1/dist/mindar-image-aframe.prod.js"></script>
   <script src="js/main.js"></script>
 
-  <a-scene mindar-image="imageTargetSrc: ./targets/targets.mind; maxTrack: 3;" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+  <!-- Add a custom component for persistent tracking -->
+  <script>
+    AFRAME.registerComponent('persistent-tracking', {
+      init: function() {
+        this.visible = false;
+        this.lastPosition = new THREE.Vector3();
+        this.lastRotation = new THREE.Euler();
+        this.lastScale = new THREE.Vector3(1, 1, 1);
+      }
+    });
+    
+    // Add device motion tracking component
+    AFRAME.registerComponent('motion-tracking', {
+      schema: {
+        enabled: { default: false }
+      },
+      
+      init: function() {
+        this.deviceOrientation = { alpha: 0, beta: 0, gamma: 0 };
+        this.lastDeviceOrientation = { alpha: 0, beta: 0, gamma: 0 };
+        this.acceleration = { x: 0, y: 0, z: 0 };
+        this.isSupported = 'DeviceOrientationEvent' in window && 'DeviceMotionEvent' in window;
+        this.isCalibrated = false;
+        this.positionOffset = new THREE.Vector3(0, 0, 0);
+        this.orientationOffset = new THREE.Euler(0, 0, 0, 'YXZ');
+        this.lastTimestamp = 0;
+        
+        this.deviceMotionHandler = this.deviceMotionHandler.bind(this);
+        this.deviceOrientationHandler = this.deviceOrientationHandler.bind(this);
+      },
+      
+      update: function() {
+        if (this.data.enabled) {
+          this.enableTracking();
+        } else {
+          this.disableTracking();
+        }
+      },
+      
+      enableTracking: function() {
+        if (!this.isSupported) return;
+        
+        // Request device orientation permissions if needed (iOS 13+)
+        if (typeof DeviceOrientationEvent !== 'undefined' && 
+            typeof DeviceOrientationEvent.requestPermission === 'function') {
+          DeviceOrientationEvent.requestPermission()
+            .then(permissionState => {
+              if (permissionState === 'granted') {
+                window.addEventListener('deviceorientation', this.deviceOrientationHandler);
+              }
+            })
+            .catch(console.error);
+        } else {
+          window.addEventListener('deviceorientation', this.deviceOrientationHandler);
+        }
+        
+        // Request device motion permissions if needed
+        if (typeof DeviceMotionEvent !== 'undefined' && 
+            typeof DeviceMotionEvent.requestPermission === 'function') {
+          DeviceMotionEvent.requestPermission()
+            .then(permissionState => {
+              if (permissionState === 'granted') {
+                window.addEventListener('devicemotion', this.deviceMotionHandler);
+              }
+            })
+            .catch(console.error);
+        } else {
+          window.addEventListener('devicemotion', this.deviceMotionHandler);
+        }
+      },
+      
+      disableTracking: function() {
+        window.removeEventListener('deviceorientation', this.deviceOrientationHandler);
+        window.removeEventListener('devicemotion', this.deviceMotionHandler);
+      },
+      
+      deviceOrientationHandler: function(event) {
+        if (!this.data.enabled) return;
+        
+        // Store orientation data in radians
+        this.lastDeviceOrientation = { ...this.deviceOrientation };
+        this.deviceOrientation.alpha = THREE.MathUtils.degToRad(event.alpha || 0);
+        this.deviceOrientation.beta = THREE.MathUtils.degToRad(event.beta || 0);
+        this.deviceOrientation.gamma = THREE.MathUtils.degToRad(event.gamma || 0);
+        
+        // Calibrate if not yet done
+        if (!this.isCalibrated && this.el.object3D.visible) {
+          this.calibrate();
+        }
+      },
+      
+      deviceMotionHandler: function(event) {
+        if (!this.data.enabled) return;
+        
+        const now = performance.now();
+        const dt = (now - this.lastTimestamp) / 1000; // convert to seconds
+        this.lastTimestamp = now;
+        
+        if (!dt || dt > 1) return; // Skip large time gaps or first reading
+        
+        // Get acceleration with gravity removed
+        const acceleration = event.accelerationIncludingGravity;
+        if (acceleration && acceleration.x !== null) {
+          // Simple low-pass filter to reduce noise
+          const alpha = 0.8;
+          this.acceleration.x = alpha * this.acceleration.x + (1 - alpha) * acceleration.x;
+          this.acceleration.y = alpha * this.acceleration.y + (1 - alpha) * acceleration.y;
+          this.acceleration.z = alpha * this.acceleration.z + (1 - alpha) * acceleration.z;
+        }
+      },
+      
+      calibrate: function() {
+        // Save the current orientation as the offset
+        this.orientationOffset.set(
+          this.deviceOrientation.beta,
+          this.deviceOrientation.alpha,
+          this.deviceOrientation.gamma
+        );
+        this.isCalibrated = true;
+      },
+      
+      tick: function(time, timeDelta) {
+        if (!this.data.enabled || !this.isCalibrated || !this.el.object3D.visible) return;
+        
+        // Get the current content entity
+        const arContent = document.getElementById('ar-content');
+        if (!arContent || !arContent.object3D.visible) return;
+        
+        // Calculate orientation difference from last frame
+        const deltaAlpha = this.deviceOrientation.alpha - this.lastDeviceOrientation.alpha;
+        const deltaBeta = this.deviceOrientation.beta - this.lastDeviceOrientation.beta;
+        const deltaGamma = this.deviceOrientation.gamma - this.lastDeviceOrientation.gamma;
+        
+        // Apply subtle orientation changes to the content based on device movement
+        arContent.object3D.rotation.y -= deltaAlpha * 0.5; // Adjust rotation factor as needed
+        arContent.object3D.rotation.x += deltaBeta * 0.5;
+        arContent.object3D.rotation.z += deltaGamma * 0.5;
+      },
+      
+      remove: function() {
+        this.disableTracking();
+      }
+    });
+  </script>
+
+  <a-scene mindar-image="imageTargetSrc: ./targets/targets.mind; maxTrack: 3; filterMinCF:0.001; filterBeta: 1000" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
     <a-assets>
       <!-- Add 3D models, textures, sounds, etc. -->
       <audio id="sound-1" src="assets/sound1.mp3" preload="auto"></audio>
@@ -76,38 +233,47 @@
       <audio id="sound-3" src="assets/sound3.mp3" preload="auto"></audio>
     </a-assets>
 
-    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    <a-camera position="0 0 0" look-controls="enabled: false" motion-tracking="enabled: false"></a-camera>
     
-    <!-- Pattern 1 AR Content -->
+    <!-- Anchor-independent AR content container that will persist -->
+    <a-entity id="ar-content" position="0 0 -1" visible="false">
+      <a-entity id="content-pattern1" visible="false">
+        <a-box id="box1" position="0 0.1 0" rotation="0 0 0" scale="0.1 0.1 0.1" color="red" animation="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear;">
+          <a-animation begin="click" attribute="scale" to="0.15 0.15 0.15" dur="300" direction="alternate" repeat="1"></a-animation>
+        </a-box>
+        <a-text value="Pattern 1" position="0 0.25 0" scale="0.5 0.5 0.5" align="center" color="#FFF" side="double"></a-text>
+      </a-entity>
+      
+      <a-entity id="content-pattern2" visible="false">
+        <a-sphere id="sphere1" position="0 0.1 0" radius="0.05" color="blue" animation="property: position; to: 0 0.2 0; dir: alternate; dur: 1000; loop: true; easing: easeInOutQuad;">
+          <a-animation begin="click" attribute="color" from="blue" to="purple" dur="500" direction="alternate" repeat="2"></a-animation>
+        </a-sphere>
+        <a-text value="Pattern 2" position="0 0.25 0" scale="0.5 0.5 0.5" align="center" color="#FFF" side="double"></a-text>
+      </a-entity>
+      
+      <a-entity id="content-pattern3" visible="false">
+        <a-cylinder id="cylinder1" position="0 0.1 0" radius="0.05" height="0.1" color="green" animation="property: rotation; to: 90 360 90; loop: true; dur: 5000; easing: linear;">
+          <a-animation begin="click" attribute="height" to="0.2" dur="500" direction="alternate" repeat="1"></a-animation>
+        </a-cylinder>
+        <a-text value="Pattern 3" position="0 0.25 0" scale="0.5 0.5 0.5" align="center" color="#FFF" side="double"></a-text>
+        <!-- Add a more complex model for pattern 3 -->
+        <a-entity position="0.15 0.1 0" scale="0.05 0.05 0.05">
+          <a-torus-knot radius="0.5" radius-tubular="0.05" p="3" q="7" color="yellow" animation="property: rotation; to: 360 360 0; loop: true; dur: 10000;"></a-torus-knot>
+        </a-entity>
+      </a-entity>
+    </a-entity>
+    
+    <!-- Pattern trackers that will update the position of the AR content -->
     <a-entity id="target1" mindar-image-target="targetIndex: 0">
-      <a-box id="box1" position="0 0.1 0" rotation="0 0 0" scale="0.1 0.1 0.1" color="red" animation="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear;">
-        <a-animation begin="click" attribute="scale" to="0.15 0.15 0.15" dur="300" direction="alternate" repeat="1"></a-animation>
-      </a-box>
-      <a-text value="Pattern 1" position="0 0.25 0" scale="0.5 0.5 0.5" align="center" color="#FFF" side="double"></a-text>
       <a-entity position="0 0 0" sound="src: #sound-1; autoplay: false; loop: false;"></a-entity>
     </a-entity>
     
-    <!-- Pattern 2 AR Content -->
     <a-entity id="target2" mindar-image-target="targetIndex: 1">
-      <a-sphere id="sphere1" position="0 0.1 0" radius="0.05" color="blue" animation="property: position; to: 0 0.2 0; dir: alternate; dur: 1000; loop: true; easing: easeInOutQuad;">
-        <a-animation begin="click" attribute="color" from="blue" to="purple" dur="500" direction="alternate" repeat="2"></a-animation>
-      </a-sphere>
-      <a-text value="Pattern 2" position="0 0.25 0" scale="0.5 0.5 0.5" align="center" color="#FFF" side="double"></a-text>
       <a-entity position="0 0 0" sound="src: #sound-2; autoplay: false; loop: false;"></a-entity>
     </a-entity>
     
-    <!-- Pattern 3 AR Content -->
     <a-entity id="target3" mindar-image-target="targetIndex: 2">
-      <a-cylinder id="cylinder1" position="0 0.1 0" radius="0.05" height="0.1" color="green" animation="property: rotation; to: 90 360 90; loop: true; dur: 5000; easing: linear;">
-        <a-animation begin="click" attribute="height" to="0.2" dur="500" direction="alternate" repeat="1"></a-animation>
-      </a-cylinder>
-      <a-text value="Pattern 3" position="0 0.25 0" scale="0.5 0.5 0.5" align="center" color="#FFF" side="double"></a-text>
       <a-entity position="0 0 0" sound="src: #sound-3; autoplay: false; loop: false;"></a-entity>
-      
-      <!-- Add a more complex model for pattern 3 -->
-      <a-entity position="0.15 0.1 0" scale="0.05 0.05 0.05">
-        <a-torus-knot radius="0.5" radius-tubular="0.05" p="3" q="7" color="yellow" animation="property: rotation; to: 360 360 0; loop: true; dur: 10000;"></a-torus-knot>
-      </a-entity>
     </a-entity>
   </a-scene>
 </body>
