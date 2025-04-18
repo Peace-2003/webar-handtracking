@@ -106,9 +106,20 @@
         this.positionOffset = new THREE.Vector3(0, 0, 0);
         this.orientationOffset = new THREE.Euler(0, 0, 0, 'YXZ');
         this.lastTimestamp = 0;
+        this.trackedEntities = []; // Store references to all tracked content entities
         
         this.deviceMotionHandler = this.deviceMotionHandler.bind(this);
         this.deviceOrientationHandler = this.deviceOrientationHandler.bind(this);
+        
+        // Find all AR content entities with visibility controllers
+        setTimeout(() => {
+          this.trackedEntities = [
+            document.getElementById('content-pattern1'),
+            document.getElementById('content-pattern2'),
+            document.getElementById('content-pattern3')
+          ];
+          console.log('Motion tracking initialized with', this.trackedEntities.length, 'tracked entities');
+        }, 1000);
       },
       
       update: function() {
@@ -183,8 +194,8 @@
         // Get acceleration with gravity removed
         const acceleration = event.accelerationIncludingGravity;
         if (acceleration && acceleration.x !== null) {
-          // Simple low-pass filter to reduce noise
-          const alpha = 0.8;
+          // Simple low-pass filter to reduce noise - reduce alpha for less lag
+          const alpha = 0.6; // Changed from 0.8 for faster response
           this.acceleration.x = alpha * this.acceleration.x + (1 - alpha) * acceleration.x;
           this.acceleration.y = alpha * this.acceleration.y + (1 - alpha) * acceleration.y;
           this.acceleration.z = alpha * this.acceleration.z + (1 - alpha) * acceleration.z;
@@ -202,21 +213,23 @@
       },
       
       tick: function(time, timeDelta) {
-        if (!this.data.enabled || !this.isCalibrated || !this.el.object3D.visible) return;
-        
-        // Get the current content entity
-        const arContent = document.getElementById('ar-content');
-        if (!arContent || !arContent.object3D.visible) return;
+        if (!this.data.enabled || !this.isCalibrated) return;
         
         // Calculate orientation difference from last frame
         const deltaAlpha = this.deviceOrientation.alpha - this.lastDeviceOrientation.alpha;
         const deltaBeta = this.deviceOrientation.beta - this.lastDeviceOrientation.beta;
         const deltaGamma = this.deviceOrientation.gamma - this.lastDeviceOrientation.gamma;
         
-        // Apply subtle orientation changes to the content based on device movement
-        arContent.object3D.rotation.y -= deltaAlpha * 0.5; // Adjust rotation factor as needed
-        arContent.object3D.rotation.x += deltaBeta * 0.5;
-        arContent.object3D.rotation.z += deltaGamma * 0.5;
+        // Update each tracked entity's position based on device movement
+        // This ensures motion tracking works even after the pattern is lost
+        this.trackedEntities.forEach(entity => {
+          if (entity && entity.object3D.visible) {
+            // Apply a faster response rate (0.7 instead of 0.5) for less lag
+            entity.object3D.rotation.y -= deltaAlpha * 0.7;
+            entity.object3D.rotation.x += deltaBeta * 0.7;
+            entity.object3D.rotation.z += deltaGamma * 0.7;
+          }
+        });
       },
       
       remove: function() {
@@ -224,48 +237,77 @@
       }
     });
     
-    // Add visibility controller for AR content
+    // Enhanced visibility controller for AR content
     AFRAME.registerComponent('ar-visibility-controller', {
       schema: {
         targetIndex: {type: 'number', default: 0}
       },
+      
       init: function() {
         this.visible = false;
         this.targetFound = false;
         this.lastPosition = new THREE.Vector3();
         this.lastRotation = new THREE.Euler();
+        this.hasBeenVisible = false; // Track if this content was ever visible
         
         // Store a reference to the entity
         const targetIndex = this.data.targetIndex;
         const sceneEl = document.querySelector('a-scene');
         
+        // Store initial world position when the component initializes
+        this.initialWorldPosition = new THREE.Vector3();
+        
         // Listen for target found/lost events
         sceneEl.addEventListener('targetFound', (event) => {
           if (parseInt(event.detail.name) === targetIndex) {
             this.targetFound = true;
+            this.hasBeenVisible = true;
+            
+            // Force visibility on
+            this.el.object3D.visible = true;
             this.el.setAttribute('visible', true);
             console.log(`Target ${targetIndex} found - Content visible`);
             
-            // Store position and rotation
-            this.lastPosition.copy(this.el.object3D.position);
-            this.lastRotation.copy(this.el.object3D.rotation);
+            // Store position and rotation in world coordinates
+            this.el.object3D.getWorldPosition(this.lastPosition);
+            this.el.object3D.getWorldQuaternion(this.lastRotation);
           }
         });
         
         sceneEl.addEventListener('targetLost', (event) => {
           if (parseInt(event.detail.name) === targetIndex) {
+            console.log(`Target ${targetIndex} lost - Ensuring content remains visible`);
             this.targetFound = false;
-            // Don't hide, just mark as not actively tracking
-            console.log(`Target ${targetIndex} lost - Content remains visible`);
+            
+            // The crucial part: ensure content STAYS visible even after target loss
+            if (this.hasBeenVisible) {
+              this.el.object3D.visible = true;
+              this.el.setAttribute('visible', true);
+            }
           }
         });
+      },
+      
+      tick: function() {
+        // Keep forcing visibility to true if it has been visible before
+        // This is a safeguard against other components hiding the content
+        if (this.hasBeenVisible && !this.el.object3D.visible) {
+          this.el.object3D.visible = true;
+        }
       }
     });
   </script>
 
-  <a-scene mindar-image="imageTargetSrc: ./targets/targets.mind; maxTrack: 3; filterMinCF:0.0001; filterBeta: 10000; warmupTolerance: 5; missTolerance: 10" color-space="sRGB" renderer="colorManagement: true; physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false" loading-screen="enabled: false">
+  <!-- Optimized A-Frame scene for reduced lag -->
+  <a-scene mindar-image="imageTargetSrc: ./targets/targets.mind; maxTrack: 3; filterMinCF:0.00001; filterBeta: 1000; warmupTolerance: 10; missTolerance: 15" 
+    color-space="sRGB" 
+    renderer="antialias: false; precision: medium; colorManagement: true; physicallyCorrectLights: false; logarithmicDepthBuffer: false" 
+    vr-mode-ui="enabled: false" 
+    device-orientation-permission-ui="enabled: false" 
+    loading-screen="enabled: false">
+    
     <a-assets>
-      <!-- Add 3D models, textures, sounds, etc. -->
+      <!-- Audio assets -->
       <audio id="sound-1" src="assets/sound1.mp3" preload="auto"></audio>
       <audio id="sound-2" src="assets/sound2.mp3" preload="auto"></audio>
       <audio id="sound-3" src="assets/sound3.mp3" preload="auto"></audio>
