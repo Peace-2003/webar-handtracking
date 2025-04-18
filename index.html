@@ -80,21 +80,139 @@
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.1/dist/mindar-image-aframe.prod.js"></script>
   <script src="js/main.js"></script>
 
-  <!-- Add a custom component for persistent tracking -->
+  <!-- Custom components for persistent AR tracking -->
   <script>
-    AFRAME.registerComponent('persistent-tracking', {
+    // Global AR state to maintain persistence across component lifecycles
+    window.arPersistence = {
+      activeContent: null,
+      lastWorldPosition: new THREE.Vector3(),
+      lastWorldQuaternion: new THREE.Quaternion(),
+      hasDetectedPattern: false
+    };
+    
+    // Component to decouple AR content from pattern targets
+    AFRAME.registerComponent('ar-content', {
+      schema: {
+        targetIndex: { type: 'number', default: 0 },
+        initialized: { type: 'boolean', default: false }
+      },
+      
       init: function() {
-        this.visible = false;
-        this.lastPosition = new THREE.Vector3();
-        this.lastRotation = new THREE.Euler();
-        this.lastScale = new THREE.Vector3(1, 1, 1);
+        this.sceneEl = document.querySelector('a-scene');
+        this.cameraEl = document.querySelector('a-camera');
+        this.targetEntity = document.querySelector(`#target${this.data.targetIndex + 1}`);
+        this.worldPosition = new THREE.Vector3();
+        this.worldQuaternion = new THREE.Quaternion();
+        this.targetDetected = false;
+        this.wasEverVisible = false;
+        this.decoupled = false; // Track if content has been decoupled
+        
+        // Create a parent for the content that will be decoupled from pattern tracking
+        this.persistentParent = document.createElement('a-entity');
+        this.persistentParent.setAttribute('id', `persistent-parent-${this.data.targetIndex}`);
+        this.persistentParent.setAttribute('visible', 'false');
+        this.sceneEl.appendChild(this.persistentParent);
+        
+        // Bind event handlers to this instance
+        this.onTargetFound = this.onTargetFound.bind(this);
+        this.onTargetLost = this.onTargetLost.bind(this);
+        
+        // Register event listeners
+        this.sceneEl.addEventListener('targetFound', this.onTargetFound);
+        this.sceneEl.addEventListener('targetLost', this.onTargetLost);
+        
+        console.log(`AR Content ${this.data.targetIndex} initialized`);
+      },
+      
+      update: function() {
+        // If we've been initialized but aren't visible, force visibility
+        if (this.data.initialized && !this.el.object3D.visible) {
+          this.el.object3D.visible = true;
+        }
+      },
+      
+      onTargetFound: function(event) {
+        const foundTargetIndex = parseInt(event.detail.name);
+        if (foundTargetIndex !== this.data.targetIndex) return;
+        
+        console.log(`Pattern ${this.data.targetIndex} found`);
+        this.targetDetected = true;
+        this.wasEverVisible = true;
+        
+        // Make sure content is visible
+        this.el.object3D.visible = true;
+        this.el.setAttribute('visible', true);
+        
+        // Get world position and rotation of the target
+        this.targetEntity.object3D.getWorldPosition(this.worldPosition);
+        this.targetEntity.object3D.getWorldQuaternion(this.worldQuaternion);
+        
+        // Store in global state
+        window.arPersistence.lastWorldPosition.copy(this.worldPosition);
+        window.arPersistence.lastWorldQuaternion.copy(this.worldQuaternion);
+        window.arPersistence.activeContent = this.data.targetIndex;
+        window.arPersistence.hasDetectedPattern = true;
+        
+        // If not already decoupled, decouple this content from the target
+        if (!this.decoupled) {
+          this.decoupleContent();
+        }
+      },
+      
+      onTargetLost: function(event) {
+        const lostTargetIndex = parseInt(event.detail.name);
+        if (lostTargetIndex !== this.data.targetIndex) return;
+        
+        console.log(`Pattern ${this.data.targetIndex} lost, but content remains visible`);
+        this.targetDetected = false;
+      },
+      
+      decoupleContent: function() {
+        if (this.decoupled) return;
+        
+        // Clone this entity's position/rotation to the persistent parent
+        this.persistentParent.object3D.position.copy(this.worldPosition);
+        this.persistentParent.object3D.quaternion.copy(this.worldQuaternion);
+        this.persistentParent.setAttribute('visible', true);
+        
+        // Move this entity to be a child of the persistent parent
+        const currentParent = this.el.parentNode;
+        currentParent.removeChild(this.el);
+        this.persistentParent.appendChild(this.el);
+        
+        // Reset local position so it appears in the same world position
+        this.el.object3D.position.set(0, 0, 0);
+        this.el.object3D.rotation.set(0, 0, 0);
+        
+        // Mark as decoupled
+        this.decoupled = true;
+        console.log(`Content ${this.data.targetIndex} decoupled from target`);
+      },
+      
+      tick: function() {
+        // Always ensure visibility if it was ever visible before
+        if (this.wasEverVisible && !this.el.object3D.visible) {
+          this.el.object3D.visible = true;
+          this.el.setAttribute('visible', true);
+        }
+        
+        // Ensure our parent is also visible
+        if (this.persistentParent && this.wasEverVisible) {
+          this.persistentParent.object3D.visible = true;
+          this.persistentParent.setAttribute('visible', true);
+        }
+      },
+      
+      remove: function() {
+        this.sceneEl.removeEventListener('targetFound', this.onTargetFound);
+        this.sceneEl.removeEventListener('targetLost', this.onTargetLost);
       }
     });
     
-    // Add device motion tracking component
+    // Enhanced device motion tracking for persistent content
     AFRAME.registerComponent('motion-tracking', {
       schema: {
-        enabled: { default: true } // Changed to true by default
+        enabled: { default: true }
       },
       
       init: function() {
@@ -103,22 +221,22 @@
         this.acceleration = { x: 0, y: 0, z: 0 };
         this.isSupported = 'DeviceOrientationEvent' in window && 'DeviceMotionEvent' in window;
         this.isCalibrated = false;
-        this.positionOffset = new THREE.Vector3(0, 0, 0);
         this.orientationOffset = new THREE.Euler(0, 0, 0, 'YXZ');
         this.lastTimestamp = 0;
-        this.trackedEntities = []; // Store references to all tracked content entities
+        this.persistentParents = [];
         
         this.deviceMotionHandler = this.deviceMotionHandler.bind(this);
         this.deviceOrientationHandler = this.deviceOrientationHandler.bind(this);
         
-        // Find all AR content entities with visibility controllers
+        // Find all persistent AR content parents
         setTimeout(() => {
-          this.trackedEntities = [
-            document.getElementById('content-pattern1'),
-            document.getElementById('content-pattern2'),
-            document.getElementById('content-pattern3')
+          this.persistentParents = [
+            document.getElementById('persistent-parent-0'),
+            document.getElementById('persistent-parent-1'),
+            document.getElementById('persistent-parent-2')
           ];
-          console.log('Motion tracking initialized with', this.trackedEntities.length, 'tracked entities');
+          console.log('Motion tracking initialized with persistent parents:', 
+                      this.persistentParents.filter(Boolean).length);
         }, 1000);
       },
       
@@ -133,7 +251,7 @@
       enableTracking: function() {
         if (!this.isSupported) return;
         
-        // Request device orientation permissions if needed (iOS 13+)
+        // Request device orientation permissions if needed
         if (typeof DeviceOrientationEvent !== 'undefined' && 
             typeof DeviceOrientationEvent.requestPermission === 'function') {
           DeviceOrientationEvent.requestPermission()
@@ -160,11 +278,14 @@
         } else {
           window.addEventListener('devicemotion', this.deviceMotionHandler);
         }
+        
+        console.log('Device motion tracking enabled');
       },
       
       disableTracking: function() {
         window.removeEventListener('deviceorientation', this.deviceOrientationHandler);
         window.removeEventListener('devicemotion', this.deviceMotionHandler);
+        console.log('Device motion tracking disabled');
       },
       
       deviceOrientationHandler: function(event) {
@@ -177,7 +298,7 @@
         this.deviceOrientation.gamma = THREE.MathUtils.degToRad(event.gamma || 0);
         
         // Calibrate if not yet done
-        if (!this.isCalibrated && this.el.object3D.visible) {
+        if (!this.isCalibrated && window.arPersistence.hasDetectedPattern) {
           this.calibrate();
         }
       },
@@ -194,8 +315,8 @@
         // Get acceleration with gravity removed
         const acceleration = event.accelerationIncludingGravity;
         if (acceleration && acceleration.x !== null) {
-          // Simple low-pass filter to reduce noise - reduce alpha for less lag
-          const alpha = 0.6; // Changed from 0.8 for faster response
+          // Simple low-pass filter to reduce noise - reduce alpha for faster response
+          const alpha = 0.5; // Even more responsive
           this.acceleration.x = alpha * this.acceleration.x + (1 - alpha) * acceleration.x;
           this.acceleration.y = alpha * this.acceleration.y + (1 - alpha) * acceleration.y;
           this.acceleration.z = alpha * this.acceleration.z + (1 - alpha) * acceleration.z;
@@ -210,24 +331,24 @@
           this.deviceOrientation.gamma
         );
         this.isCalibrated = true;
+        console.log('Motion tracking calibrated');
       },
       
-      tick: function(time, timeDelta) {
-        if (!this.data.enabled || !this.isCalibrated) return;
+      tick: function() {
+        if (!this.data.enabled || !this.isCalibrated || !window.arPersistence.hasDetectedPattern) return;
         
         // Calculate orientation difference from last frame
         const deltaAlpha = this.deviceOrientation.alpha - this.lastDeviceOrientation.alpha;
         const deltaBeta = this.deviceOrientation.beta - this.lastDeviceOrientation.beta;
         const deltaGamma = this.deviceOrientation.gamma - this.lastDeviceOrientation.gamma;
         
-        // Update each tracked entity's position based on device movement
-        // This ensures motion tracking works even after the pattern is lost
-        this.trackedEntities.forEach(entity => {
-          if (entity && entity.object3D.visible) {
-            // Apply a faster response rate (0.7 instead of 0.5) for less lag
-            entity.object3D.rotation.y -= deltaAlpha * 0.7;
-            entity.object3D.rotation.x += deltaBeta * 0.7;
-            entity.object3D.rotation.z += deltaGamma * 0.7;
+        // Apply device motion to all persistent parent entities
+        this.persistentParents.forEach(parent => {
+          if (parent && parent.object3D.visible) {
+            // Apply rotations based on device movement (faster response rate)
+            parent.object3D.rotation.y -= deltaAlpha * 0.8;
+            parent.object3D.rotation.x += deltaBeta * 0.8;
+            parent.object3D.rotation.z += deltaGamma * 0.8;
           }
         });
       },
@@ -236,72 +357,12 @@
         this.disableTracking();
       }
     });
-    
-    // Enhanced visibility controller for AR content
-    AFRAME.registerComponent('ar-visibility-controller', {
-      schema: {
-        targetIndex: {type: 'number', default: 0}
-      },
-      
-      init: function() {
-        this.visible = false;
-        this.targetFound = false;
-        this.lastPosition = new THREE.Vector3();
-        this.lastRotation = new THREE.Euler();
-        this.hasBeenVisible = false; // Track if this content was ever visible
-        
-        // Store a reference to the entity
-        const targetIndex = this.data.targetIndex;
-        const sceneEl = document.querySelector('a-scene');
-        
-        // Store initial world position when the component initializes
-        this.initialWorldPosition = new THREE.Vector3();
-        
-        // Listen for target found/lost events
-        sceneEl.addEventListener('targetFound', (event) => {
-          if (parseInt(event.detail.name) === targetIndex) {
-            this.targetFound = true;
-            this.hasBeenVisible = true;
-            
-            // Force visibility on
-            this.el.object3D.visible = true;
-            this.el.setAttribute('visible', true);
-            console.log(`Target ${targetIndex} found - Content visible`);
-            
-            // Store position and rotation in world coordinates
-            this.el.object3D.getWorldPosition(this.lastPosition);
-            this.el.object3D.getWorldQuaternion(this.lastRotation);
-          }
-        });
-        
-        sceneEl.addEventListener('targetLost', (event) => {
-          if (parseInt(event.detail.name) === targetIndex) {
-            console.log(`Target ${targetIndex} lost - Ensuring content remains visible`);
-            this.targetFound = false;
-            
-            // The crucial part: ensure content STAYS visible even after target loss
-            if (this.hasBeenVisible) {
-              this.el.object3D.visible = true;
-              this.el.setAttribute('visible', true);
-            }
-          }
-        });
-      },
-      
-      tick: function() {
-        // Keep forcing visibility to true if it has been visible before
-        // This is a safeguard against other components hiding the content
-        if (this.hasBeenVisible && !this.el.object3D.visible) {
-          this.el.object3D.visible = true;
-        }
-      }
-    });
   </script>
 
-  <!-- Optimized A-Frame scene for reduced lag -->
-  <a-scene mindar-image="imageTargetSrc: ./targets/targets.mind; maxTrack: 3; filterMinCF:0.00001; filterBeta: 1000; warmupTolerance: 10; missTolerance: 15" 
+  <!-- Optimized A-Frame scene with better detection parameters -->
+  <a-scene mindar-image="imageTargetSrc: ./targets/targets.mind; maxTrack: 3; filterMinCF:0.00001; filterBeta: 0.1; warmupTolerance: 15; missTolerance: 20" 
     color-space="sRGB" 
-    renderer="antialias: false; precision: medium; colorManagement: true; physicallyCorrectLights: false; logarithmicDepthBuffer: false" 
+    renderer="antialias: false; precision: medium; colorManagement: true; physicallyCorrectLights: false" 
     vr-mode-ui="enabled: false" 
     device-orientation-permission-ui="enabled: false" 
     loading-screen="enabled: false">
@@ -315,10 +376,9 @@
 
     <a-camera position="0 0 0" look-controls="enabled: false" motion-tracking="enabled: true"></a-camera>
     
-    <!-- Pattern 1 with direct content -->
+    <!-- Pattern 1 with content -->
     <a-entity id="target1" mindar-image-target="targetIndex: 0">
-      <!-- Container for persistent content with controller -->
-      <a-entity id="content-pattern1" ar-visibility-controller="targetIndex: 0">
+      <a-entity id="content-pattern1" ar-content="targetIndex: 0">
         <a-box id="box1" position="0 0.1 0" rotation="0 0 0" scale="0.1 0.1 0.1" color="red" animation="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear;">
           <a-animation begin="click" attribute="scale" to="0.15 0.15 0.15" dur="300" direction="alternate" repeat="1"></a-animation>
         </a-box>
@@ -326,10 +386,9 @@
       </a-entity>
     </a-entity>
     
-    <!-- Pattern 2 with direct content -->
+    <!-- Pattern 2 with content -->
     <a-entity id="target2" mindar-image-target="targetIndex: 1">
-      <!-- Container for persistent content with controller -->
-      <a-entity id="content-pattern2" ar-visibility-controller="targetIndex: 1">
+      <a-entity id="content-pattern2" ar-content="targetIndex: 1">
         <a-sphere id="sphere1" position="0 0.1 0" radius="0.05" color="blue" animation="property: position; to: 0 0.2 0; dir: alternate; dur: 1000; loop: true; easing: easeInOutQuad;">
           <a-animation begin="click" attribute="color" from="blue" to="purple" dur="500" direction="alternate" repeat="2"></a-animation>
         </a-sphere>
@@ -337,15 +396,13 @@
       </a-entity>
     </a-entity>
     
-    <!-- Pattern 3 with direct content -->
+    <!-- Pattern 3 with content -->
     <a-entity id="target3" mindar-image-target="targetIndex: 2">
-      <!-- Container for persistent content with controller -->
-      <a-entity id="content-pattern3" ar-visibility-controller="targetIndex: 2">
+      <a-entity id="content-pattern3" ar-content="targetIndex: 2">
         <a-cylinder id="cylinder1" position="0 0.1 0" radius="0.05" height="0.1" color="green" animation="property: rotation; to: 90 360 90; loop: true; dur: 5000; easing: linear;">
           <a-animation begin="click" attribute="height" to="0.2" dur="500" direction="alternate" repeat="1"></a-animation>
         </a-cylinder>
         <a-text value="Pattern 3" position="0 0.25 0" scale="0.5 0.5 0.5" align="center" color="#FFF" side="double"></a-text>
-        <!-- Add a more complex model for pattern 3 -->
         <a-entity position="0.15 0.1 0" scale="0.05 0.05 0.05">
           <a-torus-knot radius="0.5" radius-tubular="0.05" p="3" q="7" color="yellow" animation="property: rotation; to: 360 360 0; loop: true; dur: 10000;"></a-torus-knot>
         </a-entity>
