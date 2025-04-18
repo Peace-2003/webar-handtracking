@@ -1,521 +1,184 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pattern-Based Web AR Experience</title>
-  <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-    }
-    #loading {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-      background-color: rgba(0, 0, 0, 0.5);
-      color: white;
-      font-family: Arial, sans-serif;
-    }
-    #ui-container {
-      position: fixed;
-      bottom: 20px;
-      left: 0;
-      width: 100%;
-      display: flex;
-      justify-content: center;
-      z-index: 100;
-    }
-    .ui-button {
-      margin: 0 10px;
-      padding: 10px 15px;
-      background-color: rgba(255, 255, 255, 0.7);
-      border-radius: 10px;
-      font-weight: bold;
-      cursor: pointer;
-      user-select: none;
-    }
-    .info-box {
-      position: fixed;
-      top: 20px;
-      left: 20px;
-      background-color: rgba(255, 255, 255, 0.7);
-      padding: 10px;
-      border-radius: 5px;
-      font-family: Arial, sans-serif;
-      z-index: 100;
-      display: none;
-    }
-    #active-pattern {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background-color: rgba(255, 255, 255, 0.7);
-      padding: 10px;
-      border-radius: 5px;
-      font-family: Arial, sans-serif;
-      z-index: 100;
-    }
-    #position-controls {
-      position: fixed;
-      top: 60px;
-      right: 20px;
-      background-color: rgba(255, 255, 255, 0.7);
-      padding: 10px;
-      border-radius: 5px;
-      font-family: Arial, sans-serif;
-      z-index: 100;
-      display: none;
-    }
-    .position-btn {
-      width: 30px;
-      height: 30px;
-      margin: 2px;
-      background-color: #ddd;
-      border: 1px solid #999;
-      border-radius: 5px;
-      cursor: pointer;
-      font-weight: bold;
-    }
-    .control-row {
-      display: flex;
-      justify-content: center;
-      margin: 5px 0;
-    }
-    .control-label {
-      font-weight: bold;
-      margin-bottom: 5px;
-      text-align: center;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Book Experience</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        
+        #ui-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+        
+        .ui-element {
+            pointer-events: auto;
+        }
+        
+        #control-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 15px;
+        }
+        
+        .control-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.8);
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #333;
+        }
+        
+        #position-controls {
+            position: absolute;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 15px;
+            display: none;
+        }
+        
+        .position-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 5px;
+        }
+        
+        .position-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #status-display {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        
+        #info-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            max-width: 80%;
+            text-align: center;
+            display: none;
+        }
+        
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 20px;
+            z-index: 1000;
+        }
+        
+        .loading-spinner {
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-top: 5px solid white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            margin-right: 15px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-  <div id="loading">Loading AR Experience...</div>
-  <div id="ui-container">
-    <div class="ui-button" id="btn-help">Help</div>
-    <div class="ui-button" id="btn-toggle-audio">Sound: OFF</div>
-    <div class="ui-button" id="btn-toggle-motion">Motion: ON</div>
-    <div class="ui-button" id="btn-adjust-position">Adjust Position</div>
-  </div>
-  <div id="info-box" class="info-box">
-    Point your camera at one of the target patterns to see the AR content
-  </div>
-  <div id="active-pattern">No pattern detected</div>
-  
-  <!-- Position control panel -->
-  <div id="position-controls">
-    <div class="control-label">Adjust Position</div>
-    <!-- X-axis controls (left/right) -->
-    <div class="control-row">
-      <button class="position-btn" data-axis="x" data-dir="-1">◀</button>
-      <button class="position-btn" data-axis="x" data-dir="1">▶</button>
+    <!-- Loading screen -->
+    <div id="loading">
+        <div class="loading-spinner"></div>
+        <div>Loading AR Experience...</div>
     </div>
-    <!-- Y-axis controls (up/down) -->
-    <div class="control-row">
-      <button class="position-btn" data-axis="y" data-dir="1">▲</button>
-      <button class="position-btn" data-axis="y" data-dir="-1">▼</button>
+    
+    <!-- UI Container -->
+    <div id="ui-container">
+        <!-- Status display -->
+        <div id="status-display" class="ui-element">Ready to scan pattern</div>
+        
+        <!-- Info box for notifications -->
+        <div id="info-box" class="ui-element"></div>
+        
+        <!-- Control panel -->
+        <div id="control-panel" class="ui-element">
+            <button id="btn-help" class="control-btn" title="Help">?</button>
+            <button id="btn-adjust" class="control-btn" title="Adjust Position">📐</button>
+            <button id="btn-reset" class="control-btn" title="Reset Position">↺</button>
+        </div>
+        
+        <!-- Position adjustment controls -->
+        <div id="position-controls" class="ui-element">
+            <div class="position-grid">
+                <!-- Y-axis controls (up/down) -->
+                <button class="position-btn" data-axis="y" data-dir="1">⬆️</button>
+                <button class="position-btn" data-axis="z" data-dir="-1">⬆️</button>
+                <button class="position-btn" data-axis="y" data-dir="-1">⬇️</button>
+                
+                <!-- X and Z axis controls -->
+                <button class="position-btn" data-axis="x" data-dir="-1">⬅️</button>
+                <button class="position-btn" data-axis="z" data-dir="1">⬇️</button>
+                <button class="position-btn" data-axis="x" data-dir="1">➡️</button>
+            </div>
+        </div>
     </div>
-    <!-- Z-axis controls (forward/backward) -->
-    <div class="control-row">
-      <span>Depth: </span>
-      <button class="position-btn" data-axis="z" data-dir="-1">+</button>
-      <button class="position-btn" data-axis="z" data-dir="1">-</button>
-    </div>
-  </div>
-  
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.1/dist/mindar-image.prod.js"></script>
-  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.1/dist/mindar-image-aframe.prod.js"></script>
-  <script src="js/main.js"></script>
-
-  <script>
-    // Simple global state
-    window.arState = {
-      activePattern: -1,
-      motionTrackingEnabled: true,
-      isCalibrated: false,
-      // Position adjustment settings
-      positionStep: 0.05, // How much to move per button click
-      activeContent: null // Reference to currently active content
-    };
-
-    // AR content entity that uses patterns for initial positioning only
-    AFRAME.registerComponent('ar-content', {
-      schema: {
-        targetIndex: { type: 'number', default: 0 },
-        // Add position offset properties
-        offsetX: { type: 'number', default: 0 },
-        offsetY: { type: 'number', default: 0 },
-        offsetZ: { type: 'number', default: 0 }
-      },
-      
-      init: function() {
-        this.sceneEl = document.querySelector('a-scene');
-        this.worldContainerEl = document.getElementById('world-container');
-        this.statusDisplay = document.getElementById('active-pattern');
-        this.targetFound = false;
-        this.positioned = false;
-        this.worldContent = null;
-        
-        // Bind event listeners
-        this.onTargetFound = this.onTargetFound.bind(this);
-        this.onTargetLost = this.onTargetLost.bind(this);
-        
-        // Register event listeners
-        this.sceneEl.addEventListener('targetFound', this.onTargetFound);
-        this.sceneEl.addEventListener('targetLost', this.onTargetLost);
-        
-        console.log(`AR Content ${this.data.targetIndex} initialized with offsets:`, 
-                    this.data.offsetX, this.data.offsetY, this.data.offsetZ);
-      },
-      
-      onTargetFound: function(event) {
-        const targetIndex = parseInt(event.detail.name);
-        if (targetIndex !== this.data.targetIndex) return;
-        
-        console.log(`Pattern ${targetIndex} found`);
-        this.targetFound = true;
-        this.statusDisplay.textContent = `Pattern ${targetIndex + 1} detected`;
-        
-        // Set as active pattern
-        window.arState.activePattern = targetIndex;
-        
-        // Position this content in the world container, but only once
-        if (!this.positioned) {
-          this.positionInWorld();
-        } else if (this.worldContent) {
-          // If already positioned but not currently visible, show it
-          this.worldContent.setAttribute('visible', 'true');
-          this.worldContent.object3D.visible = true;
-          
-          // Hide other content
-          this.hideOtherContent();
-        }
-        
-        // Set this as active content for position controls
-        window.arState.activeContent = this.worldContent;
-      },
-      
-      onTargetLost: function(event) {
-        const targetIndex = parseInt(event.detail.name);
-        if (targetIndex !== this.data.targetIndex) return;
-        
-        console.log(`Pattern ${targetIndex} lost, but content remains visible`);
-        this.targetFound = false;
-        this.statusDisplay.textContent = `Pattern ${targetIndex + 1} - motion tracking`;
-      },
-      
-      positionInWorld: function() {
-        // Get world position/rotation from entity
-        const position = new THREE.Vector3();
-        const quaternion = new THREE.Quaternion();
-        
-        // Update matrices to ensure correct world position
-        this.el.object3D.updateMatrixWorld(true);
-        this.el.object3D.getWorldPosition(position);
-        this.el.object3D.getWorldQuaternion(quaternion);
-        
-        // Create a clone of this content in the world container
-        const worldClone = document.createElement('a-entity');
-        worldClone.setAttribute('id', `world-content-${this.data.targetIndex}`);
-        worldClone.setAttribute('visible', 'true');
-        
-        // Set position and rotation in world space
-        worldClone.object3D.position.copy(position);
-        worldClone.object3D.quaternion.copy(quaternion);
-        
-        // Apply offsets if specified
-        worldClone.object3D.position.x += this.data.offsetX;
-        worldClone.object3D.position.y += this.data.offsetY;
-        worldClone.object3D.position.z += this.data.offsetZ;
-        
-        // Move all children to the clone
-        while (this.el.firstChild) {
-          worldClone.appendChild(this.el.firstChild);
-        }
-        
-        // Add the clone to world container
-        this.worldContainerEl.appendChild(worldClone);
-        
-        // Store reference to this world content
-        this.worldContent = worldClone;
-        
-        // Hide original entity
-        this.el.setAttribute('visible', 'false');
-        this.el.object3D.visible = false;
-        
-        // Mark as positioned
-        this.positioned = true;
-        console.log(`Content ${this.data.targetIndex} positioned in world space with offsets:`,
-                    this.data.offsetX, this.data.offsetY, this.data.offsetZ);
-        
-        // Hide other content
-        this.hideOtherContent();
-        
-        // Set this as active content for position controls
-        window.arState.activeContent = worldClone;
-      },
-      
-      hideOtherContent: function() {
-        // Hide other content when this content is positioned
-        const allWorldContent = this.worldContainerEl.querySelectorAll('[id^="world-content-"]');
-        
-        allWorldContent.forEach(content => {
-          const contentId = content.getAttribute('id');
-          const contentIndex = parseInt(contentId.split('-')[2]);
-          
-          if (contentIndex !== this.data.targetIndex) {
-            content.setAttribute('visible', 'false');
-            content.object3D.visible = false;
-          }
-        });
-      },
-      
-      // Method to adjust position after it's been placed in world
-      adjustPosition: function(axis, amount) {
-        if (!this.worldContent) return;
-        
-        console.log(`Adjusting ${axis} by ${amount} for content ${this.data.targetIndex}`);
-        
-        if (axis === 'x') {
-          this.worldContent.object3D.position.x += amount;
-        } else if (axis === 'y') {
-          this.worldContent.object3D.position.y += amount;
-        } else if (axis === 'z') {
-          this.worldContent.object3D.position.z += amount;
-        }
-      },
-      
-      remove: function() {
-        this.sceneEl.removeEventListener('targetFound', this.onTargetFound);
-        this.sceneEl.removeEventListener('targetLost', this.onTargetLost);
-      }
-    });
-
-    // Enhanced motion tracking component
-    AFRAME.registerComponent('world-motion-tracking', {
-      schema: {
-        enabled: { default: true }
-      },
-      
-      init: function() {
-        this.deviceOrientation = { alpha: 0, beta: 0, gamma: 0 };
-        this.lastDeviceOrientation = { alpha: 0, beta: 0, gamma: 0 };
-        this.calibrationOrientation = { alpha: 0, beta: 0, gamma: 0 };
-        this.isCalibrated = false;
-        
-        // Bind methods
-        this.deviceOrientationHandler = this.deviceOrientationHandler.bind(this);
-        this.calibrate = this.calibrate.bind(this);
-        
-        // Enable tracking
-        this.enableTracking();
-        
-        console.log('World motion tracking initialized');
-      },
-      
-      enableTracking: function() {
-        // Request permissions on iOS if needed
-        if (typeof DeviceOrientationEvent !== 'undefined' && 
-            typeof DeviceOrientationEvent.requestPermission === 'function') {
-          DeviceOrientationEvent.requestPermission()
-            .then(permissionState => {
-              if (permissionState === 'granted') {
-                window.addEventListener('deviceorientation', this.deviceOrientationHandler);
-              }
-            })
-            .catch(console.error);
-        } else {
-          window.addEventListener('deviceorientation', this.deviceOrientationHandler);
-        }
-      },
-      
-      deviceOrientationHandler: function(event) {
-        if (!this.data.enabled) return;
-        
-        // Store previous values
-        this.lastDeviceOrientation = { ...this.deviceOrientation };
-        
-        // Convert to radians and store
-        this.deviceOrientation.alpha = THREE.MathUtils.degToRad(event.alpha || 0);
-        this.deviceOrientation.beta = THREE.MathUtils.degToRad(event.beta || 0);
-        this.deviceOrientation.gamma = THREE.MathUtils.degToRad(event.gamma || 0);
-        
-        // Calibrate when first content is positioned
-        if (window.arState.activePattern >= 0 && !this.isCalibrated) {
-          this.calibrate();
-        }
-      },
-      
-      calibrate: function() {
-        // Store initial orientation as calibration reference
-        this.calibrationOrientation = { ...this.deviceOrientation };
-        this.isCalibrated = true;
-        window.arState.isCalibrated = true;
-        console.log('Motion tracking calibrated');
-      },
-      
-      tick: function() {
-        if (!this.data.enabled || !this.isCalibrated) return;
-        
-        // Calculate orientation deltas
-        const deltaAlpha = this.deviceOrientation.alpha - this.lastDeviceOrientation.alpha;
-        const deltaBeta = this.deviceOrientation.beta - this.lastDeviceOrientation.beta;
-        const deltaGamma = this.deviceOrientation.gamma - this.lastDeviceOrientation.gamma;
-        
-        // Apply deltas to the world container
-        if (deltaAlpha || deltaBeta || deltaGamma) {
-          // Only rotate world container, not individual content
-          this.el.object3D.rotation.y -= deltaAlpha * 0.8; // yaw
-          this.el.object3D.rotation.x += deltaBeta * 0.8;  // pitch
-          this.el.object3D.rotation.z += deltaGamma * 0.8; // roll
-        }
-      },
-      
-      remove: function() {
-        window.removeEventListener('deviceorientation', this.deviceOrientationHandler);
-      }
-    });
-
-    // Button handlers
-    document.addEventListener('DOMContentLoaded', function() {
-      // Help button
-      const btnHelp = document.getElementById('btn-help');
-      const infoBox = document.getElementById('info-box');
-      btnHelp.addEventListener('click', function() {
-        infoBox.style.display = infoBox.style.display === 'none' || infoBox.style.display === '' ? 'block' : 'none';
-      });
-      
-      // Motion tracking toggle
-      const btnToggleMotion = document.getElementById('btn-toggle-motion');
-      btnToggleMotion.addEventListener('click', function() {
-        window.arState.motionTrackingEnabled = !window.arState.motionTrackingEnabled;
-        btnToggleMotion.textContent = 'Motion: ' + (window.arState.motionTrackingEnabled ? 'ON' : 'OFF');
-        
-        // Notify components
-        const worldContainer = document.getElementById('world-container');
-        if (worldContainer) {
-          worldContainer.setAttribute('world-motion-tracking', `enabled: ${window.arState.motionTrackingEnabled}`);
-        }
-      });
-      
-      // Audio toggle
-      const btnToggleAudio = document.getElementById('btn-toggle-audio');
-      let audioEnabled = false;
-      btnToggleAudio.addEventListener('click', function() {
-        audioEnabled = !audioEnabled;
-        btnToggleAudio.textContent = 'Sound: ' + (audioEnabled ? 'ON' : 'OFF');
-        
-        // Toggle all audio elements
-        const audioElements = document.querySelectorAll('audio');
-        audioElements.forEach(audio => {
-          if (audioEnabled) {
-            audio.play();
-          } else {
-            audio.pause();
-          }
-        });
-      });
-      
-      // Position adjustment controls
-      const btnAdjustPosition = document.getElementById('btn-adjust-position');
-      const positionControls = document.getElementById('position-controls');
-      
-      btnAdjustPosition.addEventListener('click', function() {
-        positionControls.style.display = positionControls.style.display === 'none' || 
-                                        positionControls.style.display === '' ? 'block' : 'none';
-      });
-      
-      // Set up position adjustment buttons
-      const positionButtons = document.querySelectorAll('.position-btn');
-      positionButtons.forEach(button => {
-        button.addEventListener('click', function() {
-          const axis = this.getAttribute('data-axis');
-          const dir = parseInt(this.getAttribute('data-dir'));
-          const step = window.arState.positionStep * dir;
-          
-          // Find current active content in AR system
-          const activeContent = window.arState.activeContent;
-          if (!activeContent) {
-            console.log('No active content to adjust');
-            return;
-          }
-          
-          // Get the ID of the content to find its controller
-          const contentId = activeContent.getAttribute('id');
-          if (!contentId) return;
-          
-          const targetIndex = parseInt(contentId.split('-')[2]);
-          const contentEl = document.querySelector(`#content${targetIndex + 1}`);
-          if (!contentEl) return;
-          
-          // Get the ar-content component
-          const arContent = contentEl.components['ar-content'];
-          if (arContent) {
-            arContent.adjustPosition(axis, step);
-          }
-        });
-      });
-    });
-  </script>
-
-  <a-scene 
-    mindar-image="imageTargetSrc: ./targets/targets.mind; maxTrack: 3; filterMinCF:0.0001; filterBeta: 0.1; warmupTolerance: 10; missTolerance: 5" 
-    color-space="sRGB" 
-    renderer="antialias: false; precision: medium; colorManagement: true; physicallyCorrectLights: false" 
-    vr-mode-ui="enabled: false" 
-    device-orientation-permission-ui="enabled: false" 
-    loading-screen="enabled: false">
     
-    <a-assets>
-      <audio id="sound-1" src="assets/sound1.mp3" preload="auto"></audio>
-      <audio id="sound-2" src="assets/sound2.mp3" preload="auto"></audio>
-      <audio id="sound-3" src="assets/sound3.mp3" preload="auto"></audio>
-    </a-assets>
-
-    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-    
-    <!-- World container that will hold all positioned content -->
-    <a-entity id="world-container" position="0 0 0" rotation="0 0 0" world-motion-tracking="enabled: true"></a-entity>
-    
-    <!-- Pattern targets - only used for initial positioning -->
-    <a-entity id="target1" mindar-image-target="targetIndex: 0">
-      <!-- Add offset parameters to adjust initial position -->
-      <a-entity id="content1" ar-content="targetIndex: 0; offsetX: 0; offsetY: 0.1; offsetZ: 0">
-        <a-box position="0 0.1 0" rotation="0 0 0" scale="0.1 0.1 0.1" color="red" animation="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear;">
-          <a-animation begin="click" attribute="scale" to="0.15 0.15 0.15" dur="300" direction="alternate" repeat="1"></a-animation>
-        </a-box>
-        <a-text value="Pattern 1" position="0 0.25 0" scale="0.5 0.5 0.5" align="center" color="#FFF" side="double"></a-text>
-      </a-entity>
-    </a-entity>
-    
-    <a-entity id="target2" mindar-image-target="targetIndex: 1">
-      <!-- Add offset parameters to adjust initial position -->
-      <a-entity id="content2" ar-content="targetIndex: 1; offsetX: 1; offsetY: 0; offsetZ: 0">
-        <a-sphere position="0 0.1 0" radius="0.05" color="blue" animation="property: position; to: 0 0.2 0; dir: alternate; dur: 1000; loop: true; easing: easeInOutQuad;">
-          <a-animation begin="click" attribute="color" from="blue" to="purple" dur="500" direction="alternate" repeat="2"></a-animation>
-        </a-sphere>
-        <a-text value="Pattern 2" position="0 0.25 0" scale="0.5 0.5 0.5" align="center" color="#FFF" side="double"></a-text>
-      </a-entity>
-    </a-entity>
-    
-    <a-entity id="target3" mindar-image-target="targetIndex: 2">
-      <!-- Add offset parameters to adjust initial position -->
-      <a-entity id="content3" ar-content="targetIndex: 2; offsetX: 0; offsetY: 0.05; offsetZ: 0">
-        <a-cylinder position="0 0.1 0" radius="0.05" height="0.1" color="green" animation="property: rotation; to: 90 360 90; loop: true; dur: 5000; easing: linear;">
-          <a-animation begin="click" attribute="height" to="0.2" dur="500" direction="alternate" repeat="1"></a-animation>
-        </a-cylinder>
-        <a-text value="Pattern 3" position="0 0.25 0" scale="0.5 0.5 0.5" align="center" color="#FFF" side="double"></a-text>
-        <a-entity position="0.15 0.1 0" scale="0.05 0.05 0.05">
-          <a-torus-knot radius="0.5" radius-tubular="0.05" p="3" q="7" color="yellow" animation="property: rotation; to: 360 360 0; loop: true; dur: 10000;"></a-torus-knot>
-        </a-entity>
-      </a-entity>
-    </a-entity>
-  </a-scene>
+    <!-- Required Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.137.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/dist/mindar-image-three.prod.js"></script>
+    <script src="js/main.js"></script>
 </body>
 </html>
