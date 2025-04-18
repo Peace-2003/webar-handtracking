@@ -223,6 +223,44 @@
         this.disableTracking();
       }
     });
+    
+    // Add visibility controller for AR content
+    AFRAME.registerComponent('ar-visibility-controller', {
+      schema: {
+        targetIndex: {type: 'number', default: 0}
+      },
+      init: function() {
+        this.visible = false;
+        this.targetFound = false;
+        this.lastPosition = new THREE.Vector3();
+        this.lastRotation = new THREE.Euler();
+        
+        // Store a reference to the entity
+        const targetIndex = this.data.targetIndex;
+        const sceneEl = document.querySelector('a-scene');
+        
+        // Listen for target found/lost events
+        sceneEl.addEventListener('targetFound', (event) => {
+          if (parseInt(event.detail.name) === targetIndex) {
+            this.targetFound = true;
+            this.el.setAttribute('visible', true);
+            console.log(`Target ${targetIndex} found - Content visible`);
+            
+            // Store position and rotation
+            this.lastPosition.copy(this.el.object3D.position);
+            this.lastRotation.copy(this.el.object3D.rotation);
+          }
+        });
+        
+        sceneEl.addEventListener('targetLost', (event) => {
+          if (parseInt(event.detail.name) === targetIndex) {
+            this.targetFound = false;
+            // Don't hide, just mark as not actively tracking
+            console.log(`Target ${targetIndex} lost - Content remains visible`);
+          }
+        });
+      }
+    });
   </script>
 
   <a-scene mindar-image="imageTargetSrc: ./targets/targets.mind; maxTrack: 3; filterMinCF:0.0001; filterBeta: 10000; warmupTolerance: 5; missTolerance: 10" color-space="sRGB" renderer="colorManagement: true; physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false" loading-screen="enabled: false">
@@ -235,23 +273,32 @@
 
     <a-camera position="0 0 0" look-controls="enabled: false" motion-tracking="enabled: true"></a-camera>
     
-    <!-- Anchor-independent AR content container that will persist -->
-    <a-entity id="ar-content" position="0 0 -0.5" visible="false">
-      <a-entity id="content-pattern1" visible="false">
+    <!-- Pattern 1 with direct content -->
+    <a-entity id="target1" mindar-image-target="targetIndex: 0">
+      <!-- Container for persistent content with controller -->
+      <a-entity id="content-pattern1" ar-visibility-controller="targetIndex: 0">
         <a-box id="box1" position="0 0.1 0" rotation="0 0 0" scale="0.1 0.1 0.1" color="red" animation="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear;">
           <a-animation begin="click" attribute="scale" to="0.15 0.15 0.15" dur="300" direction="alternate" repeat="1"></a-animation>
         </a-box>
         <a-text value="Pattern 1" position="0 0.25 0" scale="0.5 0.5 0.5" align="center" color="#FFF" side="double"></a-text>
       </a-entity>
-      
-      <a-entity id="content-pattern2" visible="false">
+    </a-entity>
+    
+    <!-- Pattern 2 with direct content -->
+    <a-entity id="target2" mindar-image-target="targetIndex: 1">
+      <!-- Container for persistent content with controller -->
+      <a-entity id="content-pattern2" ar-visibility-controller="targetIndex: 1">
         <a-sphere id="sphere1" position="0 0.1 0" radius="0.05" color="blue" animation="property: position; to: 0 0.2 0; dir: alternate; dur: 1000; loop: true; easing: easeInOutQuad;">
           <a-animation begin="click" attribute="color" from="blue" to="purple" dur="500" direction="alternate" repeat="2"></a-animation>
         </a-sphere>
         <a-text value="Pattern 2" position="0 0.25 0" scale="0.5 0.5 0.5" align="center" color="#FFF" side="double"></a-text>
       </a-entity>
-      
-      <a-entity id="content-pattern3" visible="false">
+    </a-entity>
+    
+    <!-- Pattern 3 with direct content -->
+    <a-entity id="target3" mindar-image-target="targetIndex: 2">
+      <!-- Container for persistent content with controller -->
+      <a-entity id="content-pattern3" ar-visibility-controller="targetIndex: 2">
         <a-cylinder id="cylinder1" position="0 0.1 0" radius="0.05" height="0.1" color="green" animation="property: rotation; to: 90 360 90; loop: true; dur: 5000; easing: linear;">
           <a-animation begin="click" attribute="height" to="0.2" dur="500" direction="alternate" repeat="1"></a-animation>
         </a-cylinder>
@@ -261,19 +308,6 @@
           <a-torus-knot radius="0.5" radius-tubular="0.05" p="3" q="7" color="yellow" animation="property: rotation; to: 360 360 0; loop: true; dur: 10000;"></a-torus-knot>
         </a-entity>
       </a-entity>
-    </a-entity>
-    
-    <!-- Pattern trackers that will update the position of the AR content -->
-    <a-entity id="target1" mindar-image-target="targetIndex: 0">
-      <a-box visible="false" position="0 0 0" color="red" opacity="0.5"></a-box>
-    </a-entity>
-    
-    <a-entity id="target2" mindar-image-target="targetIndex: 1">
-      <a-box visible="false" position="0 0 0" color="blue" opacity="0.5"></a-box>
-    </a-entity>
-    
-    <a-entity id="target3" mindar-image-target="targetIndex: 2">
-      <a-box visible="false" position="0 0 0" color="green" opacity="0.5"></a-box>
     </a-entity>
   </a-scene>
 </body>
